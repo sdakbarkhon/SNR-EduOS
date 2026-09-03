@@ -21,6 +21,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { useRealtimeChannel } from "@/lib/realtime";
+import { ModalPortal } from "@/components/ModalPortal";
 
 // 19.08.2026 — слова переехали в словарь, правило склонения не тронуто.
 function topicWord(n: number, d: Dictionary["curriculum"]): string {
@@ -1604,82 +1605,88 @@ export function CurriculumPlanDetailView({
           осознанным. Если среди выбранных есть наполненные — говорим числом,
           сколько этапов будет стёрто (стирает разборщик, заход Q2). */}
       {confirmRefill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !enqueueBusy && setConfirmRefill(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-3 flex items-center gap-2 text-violet-600">
-              <Sparkles className="h-5 w-5" />
-              <h3 className="text-base font-bold">{format(tc.step2RefillTitle, { n: pickedLessons.size })}</h3>
-            </div>
-            <p className="text-sm leading-relaxed text-slate-600">
-              {выбранныеНаполненные > 0
-                ? format(tc.step2RefillBody, { n: выбранныеНаполненные })
-                : tc.step2RefillNone}
-            </p>
-            <p className="mt-2 text-[11px] leading-snug text-slate-500">{tc.step2DrainHint}</p>
-            {enqueueError && <p className="mt-3 text-xs text-red-600">{enqueueError}</p>}
-            <div className="mt-4 flex gap-3">
-              <button onClick={() => setConfirmRefill(false)} disabled={enqueueBusy} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">{tc.cancel}</button>
-              <button onClick={handleEnqueue} disabled={enqueueBusy} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50">
-                {enqueueBusy ? tc.step2Enqueuing : format(tc.step2Enqueue, { n: pickedLessons.size })}
-              </button>
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !enqueueBusy && setConfirmRefill(false)}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="mb-3 flex items-center gap-2 text-violet-600">
+                <Sparkles className="h-5 w-5" />
+                <h3 className="text-base font-bold">{format(tc.step2RefillTitle, { n: pickedLessons.size })}</h3>
+              </div>
+              <p className="text-sm leading-relaxed text-slate-600">
+                {выбранныеНаполненные > 0
+                  ? format(tc.step2RefillBody, { n: выбранныеНаполненные })
+                  : tc.step2RefillNone}
+              </p>
+              <p className="mt-2 text-[11px] leading-snug text-slate-500">{tc.step2DrainHint}</p>
+              {enqueueError && <p className="mt-3 text-xs text-red-600">{enqueueError}</p>}
+              <div className="mt-4 flex gap-3">
+                <button onClick={() => setConfirmRefill(false)} disabled={enqueueBusy} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">{tc.cancel}</button>
+                <button onClick={handleEnqueue} disabled={enqueueBusy} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50">
+                  {enqueueBusy ? tc.step2Enqueuing : format(tc.step2Enqueue, { n: pickedLessons.size })}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Подтверждение массового удаления. Решение заказчика 02.09.2026:
           удалять темы с уроками МОЖНО, но человек обязан увидеть число уроков,
           которые потеряют связь с планом. Триггера в базе нет намеренно. */}
       {confirmBulkDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !bulkDeleting && setConfirmBulkDelete(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-3 flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="h-5 w-5" />
-              <h3 className="text-base font-bold">{format(tc.step3ConfirmTitle, { n: pickedTopics.length })}</h3>
-            </div>
-            <p className="text-sm leading-relaxed text-slate-600">
-              {pickedLessonCount > 0
-                ? format(tc.step3ConfirmLessons, { n: pickedLessonCount })
-                : tc.step3ConfirmNoLessons}
-            </p>
-            <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto text-xs text-slate-500">
-              {pickedTopics.map((t) => (
-                <li key={t.id} className="truncate">
-                  {t.title}
-                  {t.used_in_lessons > 0 && <span className="ml-1 text-amber-600">({t.used_in_lessons})</span>}
-                </li>
-              ))}
-            </ul>
-            {bulkDeleteError && <p className="mt-3 text-xs text-red-600">{bulkDeleteError}</p>}
-            <div className="mt-4 flex gap-3">
-              <button onClick={() => setConfirmBulkDelete(false)} disabled={bulkDeleting} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">{tc.cancel}</button>
-              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
-                {bulkDeleting ? tc.deleting : tc.deleteTopicSubmit}
-              </button>
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !bulkDeleting && setConfirmBulkDelete(false)}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="mb-3 flex items-center gap-2 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+                <h3 className="text-base font-bold">{format(tc.step3ConfirmTitle, { n: pickedTopics.length })}</h3>
+              </div>
+              <p className="text-sm leading-relaxed text-slate-600">
+                {pickedLessonCount > 0
+                  ? format(tc.step3ConfirmLessons, { n: pickedLessonCount })
+                  : tc.step3ConfirmNoLessons}
+              </p>
+              <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto text-xs text-slate-500">
+                {pickedTopics.map((t) => (
+                  <li key={t.id} className="truncate">
+                    {t.title}
+                    {t.used_in_lessons > 0 && <span className="ml-1 text-amber-600">({t.used_in_lessons})</span>}
+                  </li>
+                ))}
+              </ul>
+              {bulkDeleteError && <p className="mt-3 text-xs text-red-600">{bulkDeleteError}</p>}
+              <div className="mt-4 flex gap-3">
+                <button onClick={() => setConfirmBulkDelete(false)} disabled={bulkDeleting} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">{tc.cancel}</button>
+                <button onClick={handleBulkDelete} disabled={bulkDeleting} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
+                  {bulkDeleting ? tc.deleting : tc.deleteTopicSubmit}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !deleting && setConfirmDelete(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-3 flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="h-5 w-5" />
-              <h3 className="text-base font-bold">{tc.deleteTopicTitle}</h3>
-            </div>
-            <p className="text-sm text-slate-600">
-              «{confirmDelete.title}»
-              {confirmDelete.used_in_lessons > 0 && format(tc.deleteTopicUsedNote, { n: confirmDelete.used_in_lessons })}
-            </p>
-            <div className="mt-4 flex gap-3">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{tc.cancel}</button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
-                {deleting ? tc.deleting : tc.deleteTopicSubmit}
-              </button>
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !deleting && setConfirmDelete(null)}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="mb-3 flex items-center gap-2 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+                <h3 className="text-base font-bold">{tc.deleteTopicTitle}</h3>
+              </div>
+              <p className="text-sm text-slate-600">
+                «{confirmDelete.title}»
+                {confirmDelete.used_in_lessons > 0 && format(tc.deleteTopicUsedNote, { n: confirmDelete.used_in_lessons })}
+              </p>
+              <div className="mt-4 flex gap-3">
+                <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{tc.cancel}</button>
+                <button onClick={handleDelete} disabled={deleting} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
+                  {deleting ? tc.deleting : tc.deleteTopicSubmit}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </PageContainer>
   );

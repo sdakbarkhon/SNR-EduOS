@@ -35,6 +35,7 @@ import { FileViewerModal } from "@/components/FileViewerModal";
 import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { LibraryUploadModal, LibraryVideoLinkModal } from "@/components/KnowledgeBaseFilePicker";
 import { canUseDepartmentLibrary } from "@/lib/curator";
+import { ModalPortal } from "@/components/ModalPortal";
 
 function iconFor(fileType: string | null, isVideo: boolean) {
   if (isVideo) return Video;
@@ -111,52 +112,54 @@ function LibraryMaterialDetailModal({
   }, [onClose]);
 
   return (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
-    >
+    <ModalPortal>
       <div
-        className={`relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/40 bg-white p-8 shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
       >
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 z-20 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        <div
+          className={`relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/40 bg-white p-8 shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
         >
-          <X className="h-5 w-5" />
-        </button>
-
-        <h2 className="mb-1 pr-8 text-2xl font-bold leading-tight text-slate-900">{material.title}</h2>
-        {material.author && <p className="mb-3 text-sm text-slate-500">{material.author}</p>}
-
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {material.material_type && <MaterialTypeBadge materialType={material.material_type} large />}
-          {style && (
-            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: `${style.color}22`, color: style.color }}>
-              {style.label}
-            </span>
-          )}
-        </div>
-
-        {material.description && (
-          <p className="mb-3 line-clamp-5 text-sm leading-relaxed text-slate-600">{material.description}</p>
-        )}
-
-        <div className="mt-4">
           <button
-            onClick={onOpen}
-            disabled={opening}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#185AF7] py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+            onClick={onClose}
+            className="absolute right-4 top-4 z-20 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
-            {opening ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <BookOpen className="h-4 w-4" />
-            )}
-            {opening ? "Открываем…" : isVideo ? "Смотреть видео" : "Открыть материал"}
+            <X className="h-5 w-5" />
           </button>
+
+          <h2 className="mb-1 pr-8 text-2xl font-bold leading-tight text-slate-900">{material.title}</h2>
+          {material.author && <p className="mb-3 text-sm text-slate-500">{material.author}</p>}
+
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {material.material_type && <MaterialTypeBadge materialType={material.material_type} large />}
+            {style && (
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: `${style.color}22`, color: style.color }}>
+                {style.label}
+              </span>
+            )}
+          </div>
+
+          {material.description && (
+            <p className="mb-3 line-clamp-5 text-sm leading-relaxed text-slate-600">{material.description}</p>
+          )}
+
+          <div className="mt-4">
+            <button
+              onClick={onOpen}
+              disabled={opening}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#185AF7] py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+            >
+              {opening ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <BookOpen className="h-4 w-4" />
+              )}
+              {opening ? "Открываем…" : isVideo ? "Смотреть видео" : "Открыть материал"}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -292,24 +295,26 @@ export function TeacherLibraryTabView({
       )}
 
       {videoPlayer && (
-        <div
-          className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
-          onClick={() => setVideoPlayer(null)}
-        >
-          <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{videoPlayer.title}</p>
-              <button
-                onClick={() => setVideoPlayer(null)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
-              >
-                <X className="h-4 w-4" />
-              </button>
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+            onClick={() => setVideoPlayer(null)}
+          >
+            <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{videoPlayer.title}</p>
+                <button
+                  onClick={() => setVideoPlayer(null)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <VideoEmbedPlayer url={videoPlayer.url} />
             </div>
-            <VideoEmbedPlayer url={videoPlayer.url} />
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {showUpload && (

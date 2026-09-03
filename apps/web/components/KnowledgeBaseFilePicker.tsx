@@ -48,6 +48,7 @@ import { parseVideoUrl } from "@/lib/video-url";
 import { uploadVideoFile } from "@/lib/video-storage";
 import { canUseDepartmentLibrary } from "@/lib/curator";
 import { mySchoolStoragePath } from "@snr/core";
+import { ModalPortal } from "@/components/ModalPortal";
 
 export type PickedKnowledgeBaseFile = {
   source: "material" | "book" | "teacherLibrary";
@@ -262,169 +263,171 @@ export function LibraryUploadModal({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" style={{ zIndex: 10010 }}>
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
+    <ModalPortal>
+      <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" style={{ zIndex: 10010 }}>
+        <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
+          <button
+            onClick={onClose}
+            className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-        <h2 className="mb-6 text-xl font-bold text-slate-900">{dt.libraryUploadTitle}</h2>
+          <h2 className="mb-6 text-xl font-bold text-slate-900">{dt.libraryUploadTitle}</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              {dt.libraryName} <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={dt.libraryNamePlaceholder}
-              disabled={uploading}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                {dt.libraryName} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={dt.libraryNamePlaceholder}
+                disabled={uploading}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+            </div>
 
-          {/* Предмет. У однопредметного учителя — просто подпись, как было.
-              У многопредметного — выбор: он ведёт несколько кафедр, и материал
-              обязан попасть в ту, которую он назовёт сам. Список приходит из
-              fn_my_subject_slugs — той же функции, что стоит в политике
-              вставки, поэтому «выбрал в интерфейсе, а база отказала» тут
-              невозможно. */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
-            {slugs.length > 1 ? (
+            {/* Предмет. У однопредметного учителя — просто подпись, как было.
+                У многопредметного — выбор: он ведёт несколько кафедр, и материал
+                обязан попасть в ту, которую он назовёт сам. Список приходит из
+                fn_my_subject_slugs — той же функции, что стоит в политике
+                вставки, поэтому «выбрал в интерфейсе, а база отказала» тут
+                невозможно. */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
+              {slugs.length > 1 ? (
+                <div className="flex flex-wrap gap-2">
+                  {slugs.map((s) => {
+                    const active = s === activeSlug;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setActiveSlug(s)}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                          active
+                            ? "border-blue-400 bg-blue-50 font-semibold text-blue-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <SubjectIcon subject={s} size={18} />
+                        {getSubjectStyle(s).label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+                  <SubjectIcon subject={activeSlug} size={22} />
+                  {getSubjectStyle(activeSlug).label}
+                </div>
+              )}
+            </div>
+
+            {/* Классы — мультиселект + "Все классы" (пусто = все, ничего в junction не создаём). */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.libraryClassesLabel}</label>
               <div className="flex flex-wrap gap-2">
-                {slugs.map((s) => {
-                  const active = s === activeSlug;
+                <button
+                  type="button"
+                  onClick={() => setSelectedGroupIds(new Set())}
+                  disabled={uploading}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                    allClasses ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {dt.libraryAllClasses}
+                </button>
+                {groups.map((g) => {
+                  const active = selectedGroupIds.has(g.id);
                   return (
                     <button
-                      key={s}
+                      key={g.id}
                       type="button"
-                      onClick={() => setActiveSlug(s)}
-                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
-                        active
-                          ? "border-blue-400 bg-blue-50 font-semibold text-blue-700"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      onClick={() => toggleGroup(g.id)}
+                      disabled={uploading}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                        active ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                       }`}
                     >
-                      <SubjectIcon subject={s} size={18} />
-                      {getSubjectStyle(s).label}
+                      {g.name}
                     </button>
                   );
                 })}
               </div>
-            ) : (
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-                <SubjectIcon subject={activeSlug} size={22} />
-                {getSubjectStyle(activeSlug).label}
+            </div>
+
+            {/* File drop zone */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                {dt.libraryFile} <span className="text-red-500">*</span>
+              </label>
+              <div
+                ref={dropRef}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleFileDrop}
+                onClick={() => !uploading && fileRef.current?.click()}
+                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
+                  file ? "border-blue-400 bg-blue-50" : "border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40"
+                } ${uploading ? "pointer-events-none opacity-60" : ""}`}
+              >
+                <Upload className="h-6 w-6 text-slate-400" />
+                {file ? (
+                  <p className="text-sm font-semibold text-blue-700">{file.name} ({formatLibSize(file.size)})</p>
+                ) : (
+                  <>
+                    <p className="text-sm text-slate-600">{dt.libraryDragDrop}</p>
+                    <p className="text-xs text-slate-400">{dt.libraryMaxSize}</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.pptx,.jpg,.jpeg,.png,.mp4"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+
+            {uploading && (
+              <div>
+                <div className="mb-1 flex justify-between text-xs font-medium text-slate-500">
+                  <span>{dt.libraryUploading}</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+                </div>
               </div>
             )}
-          </div>
 
-          {/* Классы — мультиселект + "Все классы" (пусто = все, ничего в junction не создаём). */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.libraryClassesLabel}</label>
-            <div className="flex flex-wrap gap-2">
+            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setSelectedGroupIds(new Set())}
+                onClick={onClose}
                 disabled={uploading}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                  allClasses ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
               >
-                {dt.libraryAllClasses}
+                {dt.libraryCancel}
               </button>
-              {groups.map((g) => {
-                const active = selectedGroupIds.has(g.id);
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => toggleGroup(g.id)}
-                    disabled={uploading}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                      active ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {g.name}
-                  </button>
-                );
-              })}
+              <button
+                type="submit"
+                disabled={uploading || !title.trim() || !file}
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+              >
+                {uploading ? dt.libraryUploading : dt.libraryUpload}
+              </button>
             </div>
-          </div>
-
-          {/* File drop zone */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              {dt.libraryFile} <span className="text-red-500">*</span>
-            </label>
-            <div
-              ref={dropRef}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleFileDrop}
-              onClick={() => !uploading && fileRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
-                file ? "border-blue-400 bg-blue-50" : "border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40"
-              } ${uploading ? "pointer-events-none opacity-60" : ""}`}
-            >
-              <Upload className="h-6 w-6 text-slate-400" />
-              {file ? (
-                <p className="text-sm font-semibold text-blue-700">{file.name} ({formatLibSize(file.size)})</p>
-              ) : (
-                <>
-                  <p className="text-sm text-slate-600">{dt.libraryDragDrop}</p>
-                  <p className="text-xs text-slate-400">{dt.libraryMaxSize}</p>
-                </>
-              )}
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.pptx,.jpg,.jpeg,.png,.mp4"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </div>
-
-          {uploading && (
-            <div>
-              <div className="mb-1 flex justify-between text-xs font-medium text-slate-500">
-                <span>{dt.libraryUploading}</span>
-                <span>{progress}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }} />
-              </div>
-            </div>
-          )}
-
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={uploading}
-              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
-            >
-              {dt.libraryCancel}
-            </button>
-            <button
-              type="submit"
-              disabled={uploading || !title.trim() || !file}
-              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
-            >
-              {uploading ? dt.libraryUploading : dt.libraryUpload}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -497,154 +500,156 @@ export function LibraryVideoLinkModal({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" style={{ zIndex: 10010 }}>
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
+    <ModalPortal>
+      <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" style={{ zIndex: 10010 }}>
+        <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
+          <button
+            onClick={onClose}
+            className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-        <h2 className="mb-6 text-xl font-bold text-slate-900">{dt.libraryVideoModalTitle}</h2>
+          <h2 className="mb-6 text-xl font-bold text-slate-900">{dt.libraryVideoModalTitle}</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              {dt.libraryName} <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={dt.libraryNamePlaceholder}
-              disabled={saving}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                {dt.libraryName} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={dt.libraryNamePlaceholder}
+                disabled={saving}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+            </div>
 
-          {/* Предмет: у многопредметного учителя — выбор, у остальных подпись.
-              Пояснение — у такого же блока выше. */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
-            {slugs.length > 1 ? (
+            {/* Предмет: у многопредметного учителя — выбор, у остальных подпись.
+                Пояснение — у такого же блока выше. */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
+              {slugs.length > 1 ? (
+                <div className="flex flex-wrap gap-2">
+                  {slugs.map((s) => {
+                    const active = s === activeSlug;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setActiveSlug(s)}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                          active
+                            ? "border-blue-400 bg-blue-50 font-semibold text-blue-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <SubjectIcon subject={s} size={18} />
+                        {getSubjectStyle(s).label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+                  <SubjectIcon subject={activeSlug} size={22} />
+                  {getSubjectStyle(activeSlug).label}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.libraryClassesLabel}</label>
               <div className="flex flex-wrap gap-2">
-                {slugs.map((s) => {
-                  const active = s === activeSlug;
+                <button
+                  type="button"
+                  onClick={() => setSelectedGroupIds(new Set())}
+                  disabled={saving}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                    allClasses ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {dt.libraryAllClasses}
+                </button>
+                {groups.map((g) => {
+                  const active = selectedGroupIds.has(g.id);
                   return (
                     <button
-                      key={s}
+                      key={g.id}
                       type="button"
-                      onClick={() => setActiveSlug(s)}
-                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
-                        active
-                          ? "border-blue-400 bg-blue-50 font-semibold text-blue-700"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      onClick={() => toggleGroup(g.id)}
+                      disabled={saving}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                        active ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                       }`}
                     >
-                      <SubjectIcon subject={s} size={18} />
-                      {getSubjectStyle(s).label}
+                      {g.name}
                     </button>
                   );
                 })}
               </div>
-            ) : (
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-                <SubjectIcon subject={activeSlug} size={22} />
-                {getSubjectStyle(activeSlug).label}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.libraryClassesLabel}</label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedGroupIds(new Set())}
-                disabled={saving}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                  allClasses ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {dt.libraryAllClasses}
-              </button>
-              {groups.map((g) => {
-                const active = selectedGroupIds.has(g.id);
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => toggleGroup(g.id)}
-                    disabled={saving}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                      active ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {g.name}
-                  </button>
-                );
-              })}
             </div>
-          </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              {dt.libraryVideoUrlLabel} <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="url"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder={dt.libraryVideoUrlPlaceholder}
-                disabled={saving}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-              />
-            </div>
-            {urlInput.trim() && !parsed && (
-              <p className="mt-1.5 text-xs font-medium text-amber-600">{dt.libraryErrVideoUrlInvalid}</p>
-            )}
-          </div>
-
-          {/* Превью — тот же embed-URL, что уйдёт в external_url при сохранении. */}
-          {parsed && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
-              <div className="aspect-video w-full">
-                <iframe
-                  src={parsed.embedUrl}
-                  title={title || "preview"}
-                  className="h-full w-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                {dt.libraryVideoUrlLabel} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder={dt.libraryVideoUrlPlaceholder}
+                  disabled={saving}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
                 />
               </div>
+              {urlInput.trim() && !parsed && (
+                <p className="mt-1.5 text-xs font-medium text-amber-600">{dt.libraryErrVideoUrlInvalid}</p>
+              )}
             </div>
-          )}
 
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+            {/* Превью — тот же embed-URL, что уйдёт в external_url при сохранении. */}
+            {parsed && (
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
+                <div className="aspect-video w-full">
+                  <iframe
+                    src={parsed.embedUrl}
+                    title={title || "preview"}
+                    className="h-full w-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
-            >
-              {dt.libraryCancel}
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !title.trim() || !parsed}
-              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
-            >
-              {saving ? dt.libraryUploading : dt.libraryUpload}
-            </button>
-          </div>
-        </form>
+            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+              >
+                {dt.libraryCancel}
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !title.trim() || !parsed}
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+              >
+                {saving ? dt.libraryUploading : dt.libraryUpload}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -948,197 +953,199 @@ export function KnowledgeBaseFilePicker({
     // z-index above 9999 — the app's other full-screen modals (e.g. "Прикрепить
     // материал" in TeacherLessonDetailView) use style={{ zIndex: 9999 }}, and this
     // picker can be opened from inside one of them; z-[60] used to render behind it.
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4" style={{ zIndex: 10000 }} onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex h-[80vh] max-h-[700px] w-full max-w-2xl flex-col rounded-3xl bg-white shadow-2xl"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-800">{d.pickerTitle}</h2>
-          <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Tabs — порядок: Материалы группы → Библиотека → Библиотека учителей */}
-        <div className="flex gap-2 border-b border-slate-100 px-6 pt-3">
-          {!hideGroupMaterials && (
-            <button
-              onClick={() => setTab("materials")}
-              className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "materials" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
-            >
-              {d.tabGroupMaterials}
+    <ModalPortal>
+      <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4" style={{ zIndex: 10000 }} onClick={onClose}>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="flex h-[80vh] max-h-[700px] w-full max-w-2xl flex-col rounded-3xl bg-white shadow-2xl"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+            <h2 className="text-lg font-bold text-slate-800">{d.pickerTitle}</h2>
+            <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <X className="h-5 w-5" />
             </button>
-          )}
-          <button
-            onClick={() => setTab("library")}
-            className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "library" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            {d.tabLibrary}
-          </button>
-          <button
-            onClick={() => setTab("teacherLibrary")}
-            className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "teacherLibrary" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            {d.tabTeacherLibrary}
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="border-b border-slate-100 px-6 py-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={d.searchPlaceholder}
-              className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            />
           </div>
-        </div>
 
-        {/* Уборка — загрузка/видео-ссылка теперь живут прямо во вкладке
-            "Библиотека учителей" (была отдельная страница /teacher/library).
-            Куратор (subject_slug NULL) видит вкладку, но не эти кнопки —
-            RLS insert на teacher_library_materials требует subject_slug,
-            createLibraryMaterial() тоже фейлится для куратора с понятной
-            ошибкой, но проще не показывать то, что всё равно не сработает. */}
-        {tab === "teacherLibrary" && canManageLibrary && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
+          {/* Tabs — порядок: Материалы группы → Библиотека → Библиотека учителей */}
+          <div className="flex gap-2 border-b border-slate-100 px-6 pt-3">
+            {!hideGroupMaterials && (
+              <button
+                onClick={() => setTab("materials")}
+                className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "materials" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                {d.tabGroupMaterials}
+              </button>
+            )}
             <button
-              type="button"
-              onClick={() => setShowLibUpload(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-[#185AF7] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-700"
+              onClick={() => setTab("library")}
+              className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "library" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
             >
-              <Plus className="h-3.5 w-3.5" />
-              {dt.libraryUploadBtn}
+              {d.tabLibrary}
             </button>
             <button
-              type="button"
-              onClick={() => setShowLibVideo(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+              onClick={() => setTab("teacherLibrary")}
+              className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "teacherLibrary" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
             >
-              <LinkIcon className="h-3.5 w-3.5" />
-              {dt.libraryAddVideoBtn}
+              {d.tabTeacherLibrary}
             </button>
-            {deleteError && <span className="text-xs font-medium text-red-600">{deleteError}</span>}
           </div>
-        )}
-        {tab === "teacherLibrary" && !hasDepartment && myTeacher && (
+
+          {/* Search */}
           <div className="border-b border-slate-100 px-6 py-3">
-            <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
-              {dt.libraryCuratorNotice}
-            </span>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={d.searchPlaceholder}
+                className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
           </div>
-        )}
 
-        {/* Grid */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          {/* сколько записей во вкладке ДО поиска — нужно, чтобы отличить
-              «источник пуст» от «поиск ничего не нашёл» */}
-          {loading ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-400">…</div>
-          ) : tabError[tab] ? (
-            <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
-              <p className="text-sm font-medium text-red-600">{d.loadError}</p>
-              <p className="max-w-md break-words text-xs text-slate-400">{tabError[tab]}</p>
+          {/* Уборка — загрузка/видео-ссылка теперь живут прямо во вкладке
+              "Библиотека учителей" (была отдельная страница /teacher/library).
+              Куратор (subject_slug NULL) видит вкладку, но не эти кнопки —
+              RLS insert на teacher_library_materials требует subject_slug,
+              createLibraryMaterial() тоже фейлится для куратора с понятной
+              ошибкой, но проще не показывать то, что всё равно не сработает. */}
+          {tab === "teacherLibrary" && canManageLibrary && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
+              <button
+                type="button"
+                onClick={() => setShowLibUpload(true)}
+                className="flex items-center gap-1.5 rounded-xl bg-[#185AF7] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-700"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {dt.libraryUploadBtn}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowLibVideo(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+              >
+                <LinkIcon className="h-3.5 w-3.5" />
+                {dt.libraryAddVideoBtn}
+              </button>
+              {deleteError && <span className="text-xs font-medium text-red-600">{deleteError}</span>}
             </div>
-          ) : items.length === 0 ? (
-            // Пусто по-разному: в источнике ничего нет или поиск всё отфильтровал.
-            // Молчаливое «ничего не найдено» на обе ситуации и мешало понять,
-            // что происходит с вкладкой «Материалы группы».
-            <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
-              <p className="text-sm text-slate-400">
-                {sourceCountForTab === 0
-                  ? tab === "materials"
-                    ? "У этой группы пока нет материалов"
-                    : tab === "library"
-                      ? "В библиотеке пока нет книг"
-                      : "В библиотеке учителей пока нет файлов"
-                  : d.noResults}
-              </p>
-              {sourceCountForTab > 0 && query.trim() && (
-                <p className="text-xs text-slate-400">Всего на вкладке: {sourceCountForTab}</p>
-              )}
+          )}
+          {tab === "teacherLibrary" && !hasDepartment && myTeacher && (
+            <div className="border-b border-slate-100 px-6 py-3">
+              <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
+                {dt.libraryCuratorNotice}
+              </span>
             </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {items.map((it) => {
-                const key = `${it.picked.source}:${it.picked.id}`;
-                const isSelected = selected.has(key);
-                // teacherLibrary: hasLink=true для видео-ссылок (см. allItems выше)
-                // — iconFor уже отдаёт LinkIcon для hasLink, файловую иконку иначе.
-                const Icon = tab === "library" ? BookOpen : iconFor(it.picked.fileType, it.hasLink);
-                const canDelete = tab === "teacherLibrary" && it.isMine;
-                const isDeleting = deletingId === it.picked.id;
-                return (
-                  <div key={it.key} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => toggle(it.picked)}
-                      className={`flex w-full flex-col items-center gap-2 rounded-2xl border-2 p-3 text-center transition ${
-                        isSelected ? "border-blue-500 bg-blue-50" : "border-transparent hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
-                        <Icon className={`h-6 w-6 ${isSelected ? "text-blue-600" : "text-slate-500"}`} />
-                      </div>
-                      <p className="line-clamp-2 w-full break-words text-[11px] font-semibold leading-tight text-slate-700">{it.title}</p>
-                    </button>
-                    {canDelete && (
+          )}
+
+          {/* Grid */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            {/* сколько записей во вкладке ДО поиска — нужно, чтобы отличить
+                «источник пуст» от «поиск ничего не нашёл» */}
+            {loading ? (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">…</div>
+            ) : tabError[tab] ? (
+              <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
+                <p className="text-sm font-medium text-red-600">{d.loadError}</p>
+                <p className="max-w-md break-words text-xs text-slate-400">{tabError[tab]}</p>
+              </div>
+            ) : items.length === 0 ? (
+              // Пусто по-разному: в источнике ничего нет или поиск всё отфильтровал.
+              // Молчаливое «ничего не найдено» на обе ситуации и мешало понять,
+              // что происходит с вкладкой «Материалы группы».
+              <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
+                <p className="text-sm text-slate-400">
+                  {sourceCountForTab === 0
+                    ? tab === "materials"
+                      ? "У этой группы пока нет материалов"
+                      : tab === "library"
+                        ? "В библиотеке пока нет книг"
+                        : "В библиотеке учителей пока нет файлов"
+                    : d.noResults}
+                </p>
+                {sourceCountForTab > 0 && query.trim() && (
+                  <p className="text-xs text-slate-400">Всего на вкладке: {sourceCountForTab}</p>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                {items.map((it) => {
+                  const key = `${it.picked.source}:${it.picked.id}`;
+                  const isSelected = selected.has(key);
+                  // teacherLibrary: hasLink=true для видео-ссылок (см. allItems выше)
+                  // — iconFor уже отдаёт LinkIcon для hasLink, файловую иконку иначе.
+                  const Icon = tab === "library" ? BookOpen : iconFor(it.picked.fileType, it.hasLink);
+                  const canDelete = tab === "teacherLibrary" && it.isMine;
+                  const isDeleting = deletingId === it.picked.id;
+                  return (
+                    <div key={it.key} className="relative">
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(it.picked.id); }}
-                        disabled={isDeleting}
-                        title={dt.libraryDelete}
-                        className="absolute right-1 top-1 z-10 rounded-full bg-white/95 p-1 text-slate-400 shadow transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-60"
+                        onClick={() => toggle(it.picked)}
+                        className={`flex w-full flex-col items-center gap-2 rounded-2xl border-2 p-3 text-center transition ${
+                          isSelected ? "border-blue-500 bg-blue-50" : "border-transparent hover:bg-slate-50"
+                        }`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
+                          <Icon className={`h-6 w-6 ${isSelected ? "text-blue-600" : "text-slate-500"}`} />
+                        </div>
+                        <p className="line-clamp-2 w-full break-words text-[11px] font-semibold leading-tight text-slate-700">{it.title}</p>
                       </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(it.picked.id); }}
+                          disabled={isDeleting}
+                          title={dt.libraryDelete}
+                          className="absolute right-1 top-1 z-10 rounded-full bg-white/95 p-1 text-slate-400 shadow transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-60"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+            <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">
+              {d.cancel}
+            </button>
+            <button
+              onClick={confirm}
+              disabled={selected.size === 0}
+              className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {selected.size > 0 ? d.selectCount.replace("{n}", String(selected.size)) : d.select}
+            </button>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
-          <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">
-            {d.cancel}
-          </button>
-          <button
-            onClick={confirm}
-            disabled={selected.size === 0}
-            className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {selected.size > 0 ? d.selectCount.replace("{n}", String(selected.size)) : d.select}
-          </button>
-        </div>
+        {showLibUpload && myTeacher && hasDepartment && (
+          <LibraryUploadModal
+            groups={myGroups}
+            teacherId={myTeacher.id}
+            subjectSlug={myTeacher.subject_slug ?? ""}
+            dt={dt}
+            onClose={() => setShowLibUpload(false)}
+            onSuccess={() => { setShowLibUpload(false); refetchLibrary(); }}
+          />
+        )}
+        {showLibVideo && myTeacher && hasDepartment && (
+          <LibraryVideoLinkModal
+            groups={myGroups}
+            subjectSlug={myTeacher.subject_slug ?? ""}
+            dt={dt}
+            onClose={() => setShowLibVideo(false)}
+            onSuccess={() => { setShowLibVideo(false); refetchLibrary(); }}
+          />
+        )}
       </div>
-
-      {showLibUpload && myTeacher && hasDepartment && (
-        <LibraryUploadModal
-          groups={myGroups}
-          teacherId={myTeacher.id}
-          subjectSlug={myTeacher.subject_slug ?? ""}
-          dt={dt}
-          onClose={() => setShowLibUpload(false)}
-          onSuccess={() => { setShowLibUpload(false); refetchLibrary(); }}
-        />
-      )}
-      {showLibVideo && myTeacher && hasDepartment && (
-        <LibraryVideoLinkModal
-          groups={myGroups}
-          subjectSlug={myTeacher.subject_slug ?? ""}
-          dt={dt}
-          onClose={() => setShowLibVideo(false)}
-          onSuccess={() => { setShowLibVideo(false); refetchLibrary(); }}
-        />
-      )}
-    </div>
+    </ModalPortal>
   );
 }

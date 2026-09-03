@@ -13,6 +13,7 @@ import { FileViewerModal } from "@/components/FileViewerModal";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { parseVideoUrl } from "@/lib/video-url";
 import { mySchoolStoragePath } from "@snr/core";
+import { ModalPortal } from "@/components/ModalPortal";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -103,84 +104,86 @@ function TeacherBookDetailModal({
   }, [onClose]);
 
   return (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
-    >
+    <ModalPortal>
       <div
-        className={`relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
       >
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 z-20 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        <div
+          className={`relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
         >
-          <X className="h-5 w-5" />
-        </button>
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 z-20 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-        <div className="flex gap-8 p-8">
-          {/* Left: cover (portrait 3:4) */}
-          <div className="w-[38%] shrink-0">
-            <div
-              className="relative aspect-[3/4] w-full overflow-hidden rounded-xl shadow-md"
-              style={{ background: getBookGradient(book.subject) }}
-            >
-              {coverUrl ? (
-                <img
-                  src={coverUrl}
-                  alt={book.title}
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <BookSubjectIcon className="h-16 w-16" style={{ color: style.color }} />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right: info */}
-          <div className="flex flex-1 flex-col">
-            <h2 className="mb-1 text-2xl font-bold leading-tight text-slate-900">{book.title}</h2>
-            {book.author && (
-              <p className="mb-3 text-sm text-slate-500">{book.author}</p>
-            )}
-
-            <div className="mb-3 flex flex-wrap gap-2">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
-                style={{ background: style.color + "22", color: style.color }}
+          <div className="flex gap-8 p-8">
+            {/* Left: cover (portrait 3:4) */}
+            <div className="w-[38%] shrink-0">
+              <div
+                className="relative aspect-[3/4] w-full overflow-hidden rounded-xl shadow-md"
+                style={{ background: getBookGradient(book.subject) }}
               >
-                <BookSubjectIcon className="h-3.5 w-3.5" /> {SUBJECT_LABELS[book.subject] ?? book.subject}
-              </span>
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                {book.book_type}
-              </span>
-            </div>
-
-            {book.description && (
-              <p className="mb-3 line-clamp-5 text-sm leading-relaxed text-slate-600">
-                {book.description}
-              </p>
-            )}
-
-            <div className="mt-auto pt-4">
-              <button
-                onClick={onOpen}
-                disabled={opening}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#185AF7] py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
-              >
-                {opening ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                {coverUrl ? (
+                  <img
+                    src={coverUrl}
+                    alt={book.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
                 ) : (
-                  <BookOpen className="h-4 w-4" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <BookSubjectIcon className="h-16 w-16" style={{ color: style.color }} />
+                  </div>
                 )}
-                {opening ? "Открываем…" : getOpenText(book.book_type)}
-              </button>
+              </div>
+            </div>
+
+            {/* Right: info */}
+            <div className="flex flex-1 flex-col">
+              <h2 className="mb-1 text-2xl font-bold leading-tight text-slate-900">{book.title}</h2>
+              {book.author && (
+                <p className="mb-3 text-sm text-slate-500">{book.author}</p>
+              )}
+
+              <div className="mb-3 flex flex-wrap gap-2">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+                  style={{ background: style.color + "22", color: style.color }}
+                >
+                  <BookSubjectIcon className="h-3.5 w-3.5" /> {SUBJECT_LABELS[book.subject] ?? book.subject}
+                </span>
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {book.book_type}
+                </span>
+              </div>
+
+              {book.description && (
+                <p className="mb-3 line-clamp-5 text-sm leading-relaxed text-slate-600">
+                  {book.description}
+                </p>
+              )}
+
+              <div className="mt-auto pt-4">
+                <button
+                  onClick={onOpen}
+                  disabled={opening}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#185AF7] py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {opening ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <BookOpen className="h-4 w-4" />
+                  )}
+                  {opening ? "Открываем…" : getOpenText(book.book_type)}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -260,80 +263,82 @@ function BookVideoLinkModal({
   const field = "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/40 bg-white/90 p-8 shadow-2xl backdrop-blur-xl">
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
+    <ModalPortal>
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+        <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/40 bg-white/90 p-8 shadow-2xl backdrop-blur-xl">
+          <button
+            onClick={onClose}
+            className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-        <h2 className="mb-6 text-xl font-bold text-slate-900">Добавить видео-ссылку</h2>
+          <h2 className="mb-6 text-xl font-bold text-slate-900">Добавить видео-ссылку</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Название <span className="text-red-500">*</span>
-            </label>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Видеокурс по алгоритмам" disabled={saving} className={field} />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Автор</label>
-            <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)}
-              placeholder="Необязательно" disabled={saving} className={field} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Предмет</label>
-              <select value={subject} onChange={(e) => setSubject(e.target.value)} disabled={saving} className={field}>
-                {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Название <span className="text-red-500">*</span>
+              </label>
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                placeholder="Например: Видеокурс по алгоритмам" disabled={saving} className={field} />
             </div>
+
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Тип</label>
-              <select value={bookType} onChange={(e) => setBookType(e.target.value as typeof BOOK_TYPES[number])}
-                disabled={saving} className={field}>
-                {BOOK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Автор</label>
+              <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)}
+                placeholder="Необязательно" disabled={saving} className={field} />
             </div>
-          </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder="Краткое описание (необязательно)" rows={2} disabled={saving}
-              className={`${field} resize-none`} />
-          </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Предмет</label>
+                <select value={subject} onChange={(e) => setSubject(e.target.value)} disabled={saving} className={field}>
+                  {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Тип</label>
+                <select value={bookType} onChange={(e) => setBookType(e.target.value as typeof BOOK_TYPES[number])}
+                  disabled={saving} className={field}>
+                  {BOOK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Ссылка на видео <span className="text-red-500">*</span>
-            </label>
-            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://youtu.be/… , https://rutube.ru/video/… или прямая .mp4"
-              disabled={saving} className={field} />
-            <p className="mt-1.5 text-xs text-slate-500">YouTube, RuTube или прямая ссылка на .mp4</p>
-          </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+                placeholder="Краткое описание (необязательно)" rows={2} disabled={saving}
+                className={`${field} resize-none`} />
+            </div>
 
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Ссылка на видео <span className="text-red-500">*</span>
+              </label>
+              <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://youtu.be/… , https://rutube.ru/video/… или прямая .mp4"
+                disabled={saving} className={field} />
+              <p className="mt-1.5 text-xs text-slate-500">YouTube, RuTube или прямая ссылка на .mp4</p>
+            </div>
 
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} disabled={saving}
-              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60">
-              Отмена
-            </button>
-            <button type="submit" disabled={saving || !title.trim() || !url.trim()}
-              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60">
-              {saving ? "Сохраняем…" : "Добавить"}
-            </button>
-          </div>
-        </form>
+            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose} disabled={saving}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60">
+                Отмена
+              </button>
+              <button type="submit" disabled={saving || !title.trim() || !url.trim()}
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60">
+                {saving ? "Сохраняем…" : "Добавить"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -362,41 +367,43 @@ function SuccessModal({
   }, [onClose]);
 
   return (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
-    >
+    <ModalPortal>
       <div
-        className={`w-full max-w-[400px] rounded-2xl border border-white/40 bg-white p-8 shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
       >
-        <div className="mb-5 flex justify-center">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
-          >
-            <Check className="h-8 w-8 text-white" strokeWidth={2.5} />
+        <div
+          className={`w-full max-w-[400px] rounded-2xl border border-white/40 bg-white p-8 shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+        >
+          <div className="mb-5 flex justify-center">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-full"
+              style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
+            >
+              <Check className="h-8 w-8 text-white" strokeWidth={2.5} />
+            </div>
+          </div>
+          <h2 className="mb-2 text-center text-2xl font-bold text-slate-900">Книга добавлена!</h2>
+          <p className="mb-8 text-center text-sm text-slate-500">
+            <span className="font-medium text-slate-700">{title}</span> уже видна ученикам в библиотеке.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={onUploadMore}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Добавить ещё
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700"
+            >
+              Готово
+            </button>
           </div>
         </div>
-        <h2 className="mb-2 text-center text-2xl font-bold text-slate-900">Книга добавлена!</h2>
-        <p className="mb-8 text-center text-sm text-slate-500">
-          <span className="font-medium text-slate-700">{title}</span> уже видна ученикам в библиотеке.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={onUploadMore}
-            className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            Добавить ещё
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700"
-          >
-            Готово
-          </button>
-        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -492,186 +499,188 @@ function UploadModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white/90 p-8 shadow-2xl backdrop-blur-xl">
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
+    <ModalPortal>
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+        <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white/90 p-8 shadow-2xl backdrop-blur-xl">
+          <button
+            onClick={onClose}
+            className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-        <h2 className="mb-6 text-xl font-bold text-slate-900">Добавить книгу</h2>
+          <h2 className="mb-6 text-xl font-bold text-slate-900">Добавить книгу</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Название <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Алгебра 7 класс"
-              disabled={uploading}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
-
-          {/* Author */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Автор</label>
-            <input
-              type="text"
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              placeholder="И.Ф. Фамилия"
-              disabled={uploading}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
-
-          {/* Subject + Type */}
-          <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Title */}
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Предмет</label>
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Название <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Например: Алгебра 7 класс"
                 disabled={uploading}
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-              >
-                {SUBJECTS.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
+              />
             </div>
+
+            {/* Author */}
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Тип</label>
-              <select
-                value={bookType}
-                onChange={(e) => setBookType(e.target.value as typeof BOOK_TYPES[number])}
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Автор</label>
+              <input
+                type="text"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                placeholder="И.Ф. Фамилия"
                 disabled={uploading}
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-              >
-                {BOOK_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              />
             </div>
-          </div>
 
-          {/* Description */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Краткое описание (необязательно)"
-              rows={2}
-              disabled={uploading}
-              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
+            {/* Subject + Type */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Предмет</label>
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  disabled={uploading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+                >
+                  {SUBJECTS.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Тип</label>
+                <select
+                  value={bookType}
+                  onChange={(e) => setBookType(e.target.value as typeof BOOK_TYPES[number])}
+                  disabled={uploading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+                >
+                  {BOOK_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-          {/* PDF file */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              PDF-файл <span className="text-red-500">*</span>
-            </label>
-            <div
-              onClick={() => !uploading && pdfRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition-colors ${
-                pdfFile ? "border-blue-400 bg-blue-50" : "border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40"
-              } ${uploading ? "pointer-events-none opacity-60" : ""}`}
-            >
-              <Upload className="h-5 w-5 text-slate-400" />
-              {pdfFile ? (
-                <p className="text-sm font-semibold text-blue-700">
-                  {pdfFile.name} ({formatSize(pdfFile.size)})
-                </p>
-              ) : (
-                <>
-                  <p className="text-sm text-slate-600">
-                    Перетащите PDF или <span className="text-blue-600 underline">выберите</span>
+            {/* Description */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Краткое описание (необязательно)"
+                rows={2}
+                disabled={uploading}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+            </div>
+
+            {/* PDF file */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                PDF-файл <span className="text-red-500">*</span>
+              </label>
+              <div
+                onClick={() => !uploading && pdfRef.current?.click()}
+                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition-colors ${
+                  pdfFile ? "border-blue-400 bg-blue-50" : "border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40"
+                } ${uploading ? "pointer-events-none opacity-60" : ""}`}
+              >
+                <Upload className="h-5 w-5 text-slate-400" />
+                {pdfFile ? (
+                  <p className="text-sm font-semibold text-blue-700">
+                    {pdfFile.name} ({formatSize(pdfFile.size)})
                   </p>
-                  <p className="text-xs text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 — макс. 50 МБ</p>
-                </>
-              )}
+                ) : (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Перетащите PDF или <span className="text-blue-600 underline">выберите</span>
+                    </p>
+                    <p className="text-xs text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 — макс. 50 МБ</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={pdfRef}
+                type="file"
+                accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp,.mp4"
+                className="hidden"
+                onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+              />
             </div>
-            <input
-              ref={pdfRef}
-              type="file"
-              accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp,.mp4"
-              className="hidden"
-              onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
-            />
-          </div>
 
-          {/* Cover (optional) */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Обложка{" "}
-              <span className="font-normal text-slate-400">— необязательно, создаётся автоматически</span>
-            </label>
-            <div
-              onClick={() => !uploading && coverRef.current?.click()}
-              className={`flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 ${uploading ? "pointer-events-none opacity-60" : ""}`}
-            >
-              {coverFile ? (
-                <span className="text-blue-700 font-medium">{coverFile.name}</span>
-              ) : (
-                <span className="text-slate-500">Выбрать изображение (JPG, PNG, WebP)</span>
-              )}
-            </div>
-            <input
-              ref={coverRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
-            />
-          </div>
-
-          {/* Progress bar */}
-          {uploading && (
+            {/* Cover (optional) */}
             <div>
-              <div className="mb-1 flex justify-between text-xs font-medium text-slate-500">
-                <span>Загружаем…</span>
-                <span>{progress}%</span>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Обложка{" "}
+                <span className="font-normal text-slate-400">— необязательно, создаётся автоматически</span>
+              </label>
+              <div
+                onClick={() => !uploading && coverRef.current?.click()}
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 ${uploading ? "pointer-events-none opacity-60" : ""}`}
+              >
+                {coverFile ? (
+                  <span className="text-blue-700 font-medium">{coverFile.name}</span>
+                ) : (
+                  <span className="text-slate-500">Выбрать изображение (JPG, PNG, WebP)</span>
+                )}
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+              <input
+                ref={coverRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+              />
             </div>
-          )}
 
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+            {/* Progress bar */}
+            {uploading && (
+              <div>
+                <div className="mb-1 flex justify-between text-xs font-medium text-slate-500">
+                  <span>Загружаем…</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={uploading}
-              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={uploading || !title.trim() || !pdfFile}
-              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
-            >
-              {uploading ? "Загружаем…" : "Добавить"}
-            </button>
-          </div>
-        </form>
+            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={uploading}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={uploading || !title.trim() || !pdfFile}
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+              >
+                {uploading ? "Загружаем…" : "Добавить"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 

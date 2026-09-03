@@ -21,6 +21,7 @@ import { SlidesViewerModal } from "@/components/SlidesViewerModal";
 import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { isVideoUrl, parseVideoUrl } from "@/lib/video-url";
 import { mySchoolStoragePath } from "@snr/core";
+import { ModalPortal } from "@/components/ModalPortal";
 
 // ── File type helpers (same as student view) ──────────────────────────
 
@@ -195,140 +196,142 @@ function UploadModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-lg rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
+    <ModalPortal>
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="relative w-full max-w-lg rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
+          <button
+            onClick={onClose}
+            className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-        <h2 className="mb-6 text-xl font-bold text-slate-900">Загрузить материал</h2>
+          <h2 className="mb-6 text-xl font-bold text-slate-900">Загрузить материал</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Название <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Лабораторная работа №3"
-              disabled={uploading}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Краткое описание (необязательно)"
-              rows={2}
-              disabled={uploading}
-              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
-
-          {/* Group */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Группа <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              disabled={uploading}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* File drop zone */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Файл <span className="text-red-500">*</span>
-            </label>
-            <div
-              ref={dropRef}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleFileDrop}
-              onClick={() => !uploading && fileRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
-                file
-                  ? "border-blue-400 bg-blue-50"
-                  : "border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40"
-              } ${uploading ? "pointer-events-none opacity-60" : ""}`}
-            >
-              <Upload className="h-6 w-6 text-slate-400" />
-              {file ? (
-                <p className="text-sm font-semibold text-blue-700">
-                  {file.name} ({formatSize(file.size)})
-                </p>
-              ) : (
-                <>
-                  <p className="text-sm text-slate-600">
-                    Перетащите файл или <span className="text-blue-600 underline">выберите</span>
-                  </p>
-                  <p className="text-xs text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 — макс. 50 МБ</p>
-                </>
-              )}
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.mp4"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </div>
-
-          {/* Progress bar */}
-          {uploading && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Title */}
             <div>
-              <div className="mb-1 flex justify-between text-xs font-medium text-slate-500">
-                <span>Загружаем…</span>
-                <span>{progress}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Название <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Например: Лабораторная работа №3"
+                disabled={uploading}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
             </div>
-          )}
 
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+            {/* Description */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Краткое описание (необязательно)"
+                rows={2}
+                disabled={uploading}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+            </div>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={uploading}
-              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={uploading || !title.trim() || !groupId || !file}
-              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
-            >
-              {uploading ? "Загружаем…" : "Загрузить"}
-            </button>
-          </div>
-        </form>
+            {/* Group */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Группа <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                disabled={uploading}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              >
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* File drop zone */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Файл <span className="text-red-500">*</span>
+              </label>
+              <div
+                ref={dropRef}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleFileDrop}
+                onClick={() => !uploading && fileRef.current?.click()}
+                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
+                  file
+                    ? "border-blue-400 bg-blue-50"
+                    : "border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40"
+                } ${uploading ? "pointer-events-none opacity-60" : ""}`}
+              >
+                <Upload className="h-6 w-6 text-slate-400" />
+                {file ? (
+                  <p className="text-sm font-semibold text-blue-700">
+                    {file.name} ({formatSize(file.size)})
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Перетащите файл или <span className="text-blue-600 underline">выберите</span>
+                    </p>
+                    <p className="text-xs text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 — макс. 50 МБ</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.mp4"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+
+            {/* Progress bar */}
+            {uploading && (
+              <div>
+                <div className="mb-1 flex justify-between text-xs font-medium text-slate-500">
+                  <span>Загружаем…</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={uploading}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={uploading || !title.trim() || !groupId || !file}
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+              >
+                {uploading ? "Загружаем…" : "Загрузить"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -405,97 +408,99 @@ function VideoLinkModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-lg rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
+    <ModalPortal>
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="relative w-full max-w-lg rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
+          <button
+            onClick={onClose}
+            className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
-        <h2 className="mb-6 text-xl font-bold text-slate-900">Добавить видео-ссылку</h2>
+          <h2 className="mb-6 text-xl font-bold text-slate-900">Добавить видео-ссылку</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Название <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Разбор задачи на цикл for"
-              disabled={saving}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Название <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Например: Разбор задачи на цикл for"
+                disabled={saving}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Краткое описание (необязательно)"
-              rows={2}
-              disabled={saving}
-              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-          </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Краткое описание (необязательно)"
+                rows={2}
+                disabled={saving}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Группа <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              disabled={saving}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-          </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Группа <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                disabled={saving}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              >
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Ссылка на видео <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://youtu.be/… , https://rutube.ru/video/… или прямая .mp4"
-              disabled={saving}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
-            />
-            <p className="mt-1.5 text-xs text-slate-500">YouTube, RuTube или прямая ссылка на .mp4</p>
-          </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Ссылка на видео <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://youtu.be/… , https://rutube.ru/video/… или прямая .mp4"
+                disabled={saving}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+              <p className="mt-1.5 text-xs text-slate-500">YouTube, RuTube или прямая ссылка на .mp4</p>
+            </div>
 
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !title.trim() || !groupId || !url.trim()}
-              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
-            >
-              {saving ? "Сохраняем…" : "Добавить"}
-            </button>
-          </div>
-        </form>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !title.trim() || !groupId || !url.trim()}
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+              >
+                {saving ? "Сохраняем…" : "Добавить"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -526,51 +531,53 @@ function SuccessModal({
   }, [onClose]);
 
   return (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
-    >
+    <ModalPortal>
       <div
-        className={`w-full max-w-[400px] rounded-2xl border border-white/40 bg-white p-8 shadow-2xl transition-all duration-200 ${
-          visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${
+          visible ? "opacity-100" : "opacity-0"
         }`}
       >
-        <div className="mb-5 flex justify-center">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
-          >
-            <Check className="h-8 w-8 text-white" strokeWidth={2.5} />
+        <div
+          className={`w-full max-w-[400px] rounded-2xl border border-white/40 bg-white p-8 shadow-2xl transition-all duration-200 ${
+            visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
+          }`}
+        >
+          <div className="mb-5 flex justify-center">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-full"
+              style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
+            >
+              <Check className="h-8 w-8 text-white" strokeWidth={2.5} />
+            </div>
+          </div>
+
+          <h2 className="mb-2 text-center text-2xl font-bold text-slate-900">
+            Материал загружен!
+          </h2>
+
+          <p className="mb-8 text-center text-sm text-slate-500">
+            <span className="font-medium text-slate-700">{title}</span> уже виден ученикам группы{" "}
+            <span className="font-medium text-slate-700">{groupName}</span>.
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onUploadMore}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Загрузить ещё
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700"
+            >
+              Готово
+            </button>
           </div>
         </div>
-
-        <h2 className="mb-2 text-center text-2xl font-bold text-slate-900">
-          Материал загружен!
-        </h2>
-
-        <p className="mb-8 text-center text-sm text-slate-500">
-          <span className="font-medium text-slate-700">{title}</span> уже виден ученикам группы{" "}
-          <span className="font-medium text-slate-700">{groupName}</span>.
-        </p>
-
-        <div className="flex gap-3">
-          <button
-            onClick={onUploadMore}
-            className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            Загрузить ещё
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700"
-          >
-            Готово
-          </button>
-        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -787,24 +794,26 @@ export function TeacherMaterialsView({
         />
       )}
       {videoPlayer && (
-        <div
-          className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
-          onClick={() => setVideoPlayer(null)}
-        >
-          <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{videoPlayer.title}</p>
-              <button
-                onClick={() => setVideoPlayer(null)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
-              >
-                <X className="h-4 w-4" />
-              </button>
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+            onClick={() => setVideoPlayer(null)}
+          >
+            <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{videoPlayer.title}</p>
+                <button
+                  onClick={() => setVideoPlayer(null)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <VideoEmbedPlayer url={videoPlayer.url} />
             </div>
-            <VideoEmbedPlayer url={videoPlayer.url} />
           </div>
-        </div>
+        </ModalPortal>
       )}
       {successInfo && (
         <SuccessModal

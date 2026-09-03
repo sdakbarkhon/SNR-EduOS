@@ -16,6 +16,7 @@ import { FileViewerModal } from "@/components/FileViewerModal";
 import { SlidesViewerModal } from "@/components/SlidesViewerModal";
 import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { isVideoUrl } from "@/lib/video-url";
+import { ModalPortal } from "@/components/ModalPortal";
 
 // ── File type helpers ─────────────────────────────────────────────────
 
@@ -244,24 +245,26 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
         />
       )}
       {videoPlayer && (
-        <div
-          className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
-          onClick={() => setVideoPlayer(null)}
-        >
-          <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{videoPlayer.title}</p>
-              <button
-                onClick={() => setVideoPlayer(null)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
-              >
-                <X className="h-4 w-4" />
-              </button>
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+            onClick={() => setVideoPlayer(null)}
+          >
+            <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{videoPlayer.title}</p>
+                <button
+                  onClick={() => setVideoPlayer(null)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <VideoEmbedPlayer url={videoPlayer.url} />
             </div>
-            <VideoEmbedPlayer url={videoPlayer.url} />
           </div>
-        </div>
+        </ModalPortal>
       )}
       {/* Header — omitted when hosted under the Knowledge Base tab switcher
           (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2), which already shows its own title. */}

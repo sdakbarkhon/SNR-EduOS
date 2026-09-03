@@ -7,6 +7,7 @@ import { getDictionary, getBooksForPlanSource, getCurriculumPlanForGroupSubject 
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
+import { ModalPortal } from "@/components/ModalPortal";
 
 /**
  * Сборка учебного плана из учебника.
@@ -108,89 +109,91 @@ export function FromBookModal({
   const labelCls = "mb-1 block text-xs font-semibold text-gray-600";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-blue-600" />
-            <div>
-              <h2 className="text-base font-bold text-slate-900">{d.fromBookTitle}</h2>
-              <p className="text-xs text-slate-400">{d.fromBookSubtitle}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
-        </div>
-
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className={labelCls}>{dict.teacher.bulkGroup}</label>
-              <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={inputCls}>
-                {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>{dict.teacher.bulkSubject}</label>
-              <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={inputCls}>
-                {groupSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className={labelCls}>{d.fromBookPick}</label>
-            {books === null ? (
-              <p className="py-4 text-center text-sm text-slate-400">{dict.common.loading}</p>
-            ) : books.length === 0 ? (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-                {d.fromBookNoBooks}
-              </p>
-            ) : (
-              <div className="max-h-64 space-y-1.5 overflow-y-auto">
-                {books.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => setBookId(b.id)}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                      bookId === b.id ? "border-blue-400 bg-blue-50" : "border-slate-200 hover:border-blue-200"
-                    }`}
-                  >
-                    <BookOpen className={`h-4 w-4 shrink-0 ${bookId === b.id ? "text-blue-600" : "text-slate-300"}`} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-800">{b.title}</span>
-                      <span className="block truncate text-[11px] text-slate-400">
-                        {[b.author, b.subject, b.file_size_bytes ? `${Math.round(b.file_size_bytes / 1024 / 1024 * 10) / 10} ${d.fromBookSizeMb}` : null]
-                          .filter(Boolean).join(" · ")}
-                      </span>
-                    </span>
-                  </button>
-                ))}
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+        <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-blue-600" />
+              <div>
+                <h2 className="text-base font-bold text-slate-900">{d.fromBookTitle}</h2>
+                <p className="text-xs text-slate-400">{d.fromBookSubtitle}</p>
               </div>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          </div>
+
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelCls}>{dict.teacher.bulkGroup}</label>
+                <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={inputCls}>
+                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{dict.teacher.bulkSubject}</label>
+                <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={inputCls}>
+                  {groupSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls}>{d.fromBookPick}</label>
+              {books === null ? (
+                <p className="py-4 text-center text-sm text-slate-400">{dict.common.loading}</p>
+              ) : books.length === 0 ? (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  {d.fromBookNoBooks}
+                </p>
+              ) : (
+                <div className="max-h-64 space-y-1.5 overflow-y-auto">
+                  {books.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setBookId(b.id)}
+                      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                        bookId === b.id ? "border-blue-400 bg-blue-50" : "border-slate-200 hover:border-blue-200"
+                      }`}
+                    >
+                      <BookOpen className={`h-4 w-4 shrink-0 ${bookId === b.id ? "text-blue-600" : "text-slate-300"}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-800">{b.title}</span>
+                        <span className="block truncate text-[11px] text-slate-400">
+                          {[b.author, b.subject, b.file_size_bytes ? `${Math.round(b.file_size_bytes / 1024 / 1024 * 10) / 10} ${d.fromBookSizeMb}` : null]
+                            .filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                {error}
+              </p>
             )}
           </div>
 
-          {error && (
-            <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              {error}
-            </p>
-          )}
-        </div>
-
-        <div className="flex shrink-0 gap-3 border-t border-slate-100 px-5 py-4">
-          <button onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
-            {dict.common.cancel}
-          </button>
-          <button
-            onClick={start}
-            disabled={busy || !bookId || !groupId || !subjectId}
-            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40"
-          >
-            {busy ? d.fromBookStarting : d.fromBookStart}
-          </button>
+          <div className="flex shrink-0 gap-3 border-t border-slate-100 px-5 py-4">
+            <button onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+              {dict.common.cancel}
+            </button>
+            <button
+              onClick={start}
+              disabled={busy || !bookId || !groupId || !subjectId}
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40"
+            >
+              {busy ? d.fromBookStarting : d.fromBookStart}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

@@ -25,6 +25,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { useSchoolNow, useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { BulkLessonsModal } from "./BulkLessonsModal";
+import { ModalPortal } from "@/components/ModalPortal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -441,137 +442,141 @@ function LessonFormModal({
   // No subjects assigned to this teacher at all
   if (teacherSubjects.length === 0) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-[#1D1D1F]">Новый урок</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+      <ModalPortal>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-[#1D1D1F]">Новый урок</h2>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            <p className="text-sm text-zinc-600">{d.createNoSubjects}</p>
+            <button onClick={onClose} className="mt-4 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Закрыть</button>
           </div>
-          <p className="text-sm text-zinc-600">{d.createNoSubjects}</p>
-          <button onClick={onClose} className="mt-4 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Закрыть</button>
         </div>
-      </div>
+      </ModalPortal>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-y-auto max-h-[90vh]">
-        <div className="flex items-center justify-between p-6 pb-4">
-          <h2 className="text-lg font-bold text-[#1D1D1F]">
-            {mode === "create" ? "Новый урок" : "Редактировать урок"}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
-          <div>
-            <label className={labelCls}>Группа *</label>
-            <select
-              value={form.groupId}
-              onChange={e => { set("groupId", e.target.value); set("subjectId", ""); }}
-              className={inputCls}
-            >
-              <option value="">Выберите группу</option>
-              {(groupsWithSubjects.length > 0 ? groupsWithSubjects : groups).map(g => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-y-auto max-h-[90vh]">
+          <div className="flex items-center justify-between p-6 pb-4">
+            <h2 className="text-lg font-bold text-[#1D1D1F]">
+              {mode === "create" ? "Новый урок" : "Редактировать урок"}
+            </h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          {form.groupId && (
+          <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
             <div>
-              <label className={labelCls}>{d.createSelectSubject} *</label>
-              {groupSubjects.length === 0 ? (
-                <p className="text-xs text-amber-600 mt-1">{d.createNoSubjects}</p>
-              ) : (
-                <select value={form.subjectId} onChange={e => set("subjectId", e.target.value)} className={inputCls}>
-                  <option value="">— выберите предмет —</option>
-                  {groupSubjects.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              )}
-              {/* Смена предмета у урока, за который уже стоят оценки. Не
-                  запрещаем: отличить исправленную опечатку от переноса
-                  истории может только человек. Показываем, сколько оценок
-                  поедет, и оставляем решение ему. */}
-              {предупредить && (
-                <p className="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                  {d.editSubjectHasGrades.replace("{n}", String(оценокУУрока))}
-                </p>
-              )}
-            </div>
-          )}
-          {mode === "create" && planTopics && planTopics.length > 0 && (
-            <div>
-              <label className={labelCls}>{dc.topicFromPlan}</label>
+              <label className={labelCls}>Группа *</label>
               <select
-                value={useCustomTopic ? "__custom__" : form.curriculumTopicId}
-                onChange={(e) => {
-                  if (e.target.value === "__custom__") {
-                    setUseCustomTopic(true);
-                    set("curriculumTopicId", "");
-                  } else {
-                    setUseCustomTopic(false);
-                    set("curriculumTopicId", e.target.value);
-                    const topic = planTopics.find((t) => t.id === e.target.value);
-                    if (topic) set("title", topic.title);
-                  }
-                }}
+                value={form.groupId}
+                onChange={e => { set("groupId", e.target.value); set("subjectId", ""); }}
                 className={inputCls}
               >
-                <option value="" disabled>— выберите тему —</option>
-                {planTopics.map((t, i) => (
-                  <option key={t.id} value={t.id}>
-                    {i + 1}. {t.title} ({t.used_in_lessons > 0 ? `использована в ${t.used_in_lessons} уроках` : "не использована"})
-                  </option>
+                <option value="">Выберите группу</option>
+                {(groupsWithSubjects.length > 0 ? groupsWithSubjects : groups).map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
-                <option value="__custom__">{dc.enterCustomTopic}</option>
               </select>
             </div>
-          )}
-          <div>
-            <label className={labelCls}>Дата *</label>
-            <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
-          </div>
-          <div>
-            <label className={`${labelCls} flex items-center gap-1.5`}>
-              <Clock className="h-3.5 w-3.5" /> Время начала *
-            </label>
-            <IosTimePicker value={form.startTime} onChange={v => set("startTime", v)} minDate={form.date} />
-          </div>
-          {/* ДЛИТЕЛЬНОСТИ ЗДЕСЬ БОЛЬШЕ НЕТ (01.09.2026, миграция 246).
-              Её задаёт суперадмин в карточке школы — одно число на всех, и
-              спрашивать его у предметника незачем: сетка звонков в школе одна.
-              Новый урок берёт длительность у школы сам (createLesson), у
-              существующего своё время начала и конца уже записано. */}
-          <div>
-            <label className={labelCls}>Кабинет</label>
-            <input type="text" value={form.room} onChange={e => set("room", e.target.value)} placeholder="например: 305" className={inputCls} />
-          </div>
-          {(mode !== "create" || !planTopics || planTopics.length === 0 || useCustomTopic) && (
+            {form.groupId && (
+              <div>
+                <label className={labelCls}>{d.createSelectSubject} *</label>
+                {groupSubjects.length === 0 ? (
+                  <p className="text-xs text-amber-600 mt-1">{d.createNoSubjects}</p>
+                ) : (
+                  <select value={form.subjectId} onChange={e => set("subjectId", e.target.value)} className={inputCls}>
+                    <option value="">— выберите предмет —</option>
+                    {groupSubjects.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
+                {/* Смена предмета у урока, за который уже стоят оценки. Не
+                    запрещаем: отличить исправленную опечатку от переноса
+                    истории может только человек. Показываем, сколько оценок
+                    поедет, и оставляем решение ему. */}
+                {предупредить && (
+                  <p className="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                    {d.editSubjectHasGrades.replace("{n}", String(оценокУУрока))}
+                  </p>
+                )}
+              </div>
+            )}
+            {mode === "create" && planTopics && planTopics.length > 0 && (
+              <div>
+                <label className={labelCls}>{dc.topicFromPlan}</label>
+                <select
+                  value={useCustomTopic ? "__custom__" : form.curriculumTopicId}
+                  onChange={(e) => {
+                    if (e.target.value === "__custom__") {
+                      setUseCustomTopic(true);
+                      set("curriculumTopicId", "");
+                    } else {
+                      setUseCustomTopic(false);
+                      set("curriculumTopicId", e.target.value);
+                      const topic = planTopics.find((t) => t.id === e.target.value);
+                      if (topic) set("title", topic.title);
+                    }
+                  }}
+                  className={inputCls}
+                >
+                  <option value="" disabled>— выберите тему —</option>
+                  {planTopics.map((t, i) => (
+                    <option key={t.id} value={t.id}>
+                      {i + 1}. {t.title} ({t.used_in_lessons > 0 ? `использована в ${t.used_in_lessons} уроках` : "не использована"})
+                    </option>
+                  ))}
+                  <option value="__custom__">{dc.enterCustomTopic}</option>
+                </select>
+              </div>
+            )}
             <div>
-              <label className={labelCls}>Название урока (опционально)</label>
-              <input type="text" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Например: Циклы в Python" className={inputCls} />
+              <label className={labelCls}>Дата *</label>
+              <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
             </div>
-          )}
-          <div>
-            <label className={labelCls}>Описание / цель (опционально)</label>
-            <textarea rows={2} value={form.desc} onChange={e => set("desc", e.target.value)} placeholder="Что ученики должны узнать" className={`${inputCls} resize-none`} />
-          </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
-              Отмена
-            </button>
-            <button type="submit" disabled={saving} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50">
-              {saving ? "Сохраняем…" : mode === "create" ? "Создать урок" : "Сохранить"}
-            </button>
-          </div>
-        </form>
+            <div>
+              <label className={`${labelCls} flex items-center gap-1.5`}>
+                <Clock className="h-3.5 w-3.5" /> Время начала *
+              </label>
+              <IosTimePicker value={form.startTime} onChange={v => set("startTime", v)} minDate={form.date} />
+            </div>
+            {/* ДЛИТЕЛЬНОСТИ ЗДЕСЬ БОЛЬШЕ НЕТ (01.09.2026, миграция 246).
+                Её задаёт суперадмин в карточке школы — одно число на всех, и
+                спрашивать его у предметника незачем: сетка звонков в школе одна.
+                Новый урок берёт длительность у школы сам (createLesson), у
+                существующего своё время начала и конца уже записано. */}
+            <div>
+              <label className={labelCls}>Кабинет</label>
+              <input type="text" value={form.room} onChange={e => set("room", e.target.value)} placeholder="например: 305" className={inputCls} />
+            </div>
+            {(mode !== "create" || !planTopics || planTopics.length === 0 || useCustomTopic) && (
+              <div>
+                <label className={labelCls}>Название урока (опционально)</label>
+                <input type="text" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Например: Циклы в Python" className={inputCls} />
+              </div>
+            )}
+            <div>
+              <label className={labelCls}>Описание / цель (опционально)</label>
+              <textarea rows={2} value={form.desc} onChange={e => set("desc", e.target.value)} placeholder="Что ученики должны узнать" className={`${inputCls} resize-none`} />
+            </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                Отмена
+              </button>
+              <button type="submit" disabled={saving} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50">
+                {saving ? "Сохраняем…" : mode === "create" ? "Создать урок" : "Сохранить"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -586,27 +591,29 @@ function DeleteModal({ lesson, onClose, onConfirm }: {
     try { await onConfirm(); } catch { setDeleting(false); }
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="mb-4 flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#1D1D1F]">Удалить урок?</h3>
+              <p className="mt-1 text-sm text-gray-500">«{title}» — удалит все связанные материалы. Необратимо.</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base font-bold text-[#1D1D1F]">Удалить урок?</h3>
-            <p className="mt-1 text-sm text-gray-500">«{title}» — удалит все связанные материалы. Необратимо.</p>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+              Отмена
+            </button>
+            <button onClick={handleConfirm} disabled={deleting} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white shadow-md shadow-red-500/25 transition-all hover:bg-red-700 active:scale-95 disabled:opacity-50">
+              {deleting ? "Удаляем…" : "Удалить"}
+            </button>
           </div>
-        </div>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
-            Отмена
-          </button>
-          <button onClick={handleConfirm} disabled={deleting} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white shadow-md shadow-red-500/25 transition-all hover:bg-red-700 active:scale-95 disabled:opacity-50">
-            {deleting ? "Удаляем…" : "Удалить"}
-          </button>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 

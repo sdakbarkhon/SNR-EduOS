@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { FromBookModal } from "./FromBookModal";
+import { ModalPortal } from "@/components/ModalPortal";
 
 type GroupItem = { id: string; name: string };
 type SubjectItem = { id: string; name: string; group_id: string };
@@ -225,76 +226,80 @@ function UploadPlanModal({
   const labelCls = "mb-1 block text-xs font-semibold text-gray-600";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">{d.uploadPlan}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
-        </div>
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+        <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
+            <h2 className="text-lg font-bold text-slate-900">{d.uploadPlan}</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          <div className="space-y-4">
-            <div>
-              <label className={labelCls}>{d.fieldGroup}</label>
-              <select value={groupId} onChange={(e) => { setGroupId(e.target.value); setSubjectId(""); }} className={inputCls}>
-                <option value="">{d.selectGroupPlaceholder}</option>
-                {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-            </div>
-            {groupId && (
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="space-y-4">
               <div>
-                <label className={labelCls}>{d.fieldSubject}</label>
-                <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={inputCls}>
-                  <option value="">{d.selectSubjectPlaceholder}</option>
-                  {groupSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                <label className={labelCls}>{d.fieldGroup}</label>
+                <select value={groupId} onChange={(e) => { setGroupId(e.target.value); setSubjectId(""); }} className={inputCls}>
+                  <option value="">{d.selectGroupPlaceholder}</option>
+                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               </div>
-            )}
-            <div>
-              <label className={labelCls}>{d.fieldPlanFile}</label>
-              <input ref={fileRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleFileChange} />
-              <button onClick={() => fileRef.current?.click()}
-                className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
-                <FileText className="h-5 w-5" />
-                {file ? file.name : d.pickFileBtn}
+              {groupId && (
+                <div>
+                  <label className={labelCls}>{d.fieldSubject}</label>
+                  <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={inputCls}>
+                    <option value="">{d.selectSubjectPlaceholder}</option>
+                    {groupSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className={labelCls}>{d.fieldPlanFile}</label>
+                <input ref={fileRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleFileChange} />
+                <button onClick={() => fileRef.current?.click()}
+                  className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
+                  <FileText className="h-5 w-5" />
+                  {file ? file.name : d.pickFileBtn}
+                </button>
+                {fileError && <p className="mt-1.5 text-[12px] text-red-500">{fileError}</p>}
+              </div>
+              {uploadError && <p className="text-sm text-red-500">{uploadError}</p>}
+              <button
+                onClick={handleUploadClick}
+                disabled={uploading || !groupId || !subjectId || !file}
+                className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {uploading ? d.uploading : d.uploadPlan}
               </button>
-              {fileError && <p className="mt-1.5 text-[12px] text-red-500">{fileError}</p>}
+              <p className="text-center text-[11px] text-slate-400">
+                {d.uploadHint}
+              </p>
             </div>
-            {uploadError && <p className="text-sm text-red-500">{uploadError}</p>}
-            <button
-              onClick={handleUploadClick}
-              disabled={uploading || !groupId || !subjectId || !file}
-              className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {uploading ? d.uploading : d.uploadPlan}
-            </button>
-            <p className="text-center text-[11px] text-slate-400">
-              {d.uploadHint}
-            </p>
           </div>
         </div>
-      </div>
 
-      {confirmReplace && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={(e) => e.stopPropagation()}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-3 flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="h-5 w-5" />
-              <h3 className="text-base font-bold">{d.planExistsWarning}</h3>
+        {confirmReplace && (
+          <ModalPortal>
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+                <div className="mb-3 flex items-center gap-2 text-amber-600">
+                  <AlertTriangle className="h-5 w-5" />
+                  <h3 className="text-base font-bold">{d.planExistsWarning}</h3>
+                </div>
+                <p className="text-sm text-slate-600">
+                  {format(d.replaceConfirm, { n: confirmReplace.topics.length, word: topicWord(confirmReplace.topics.length, d) })}
+                  {" "}{d.replaceNote}
+                </p>
+                <div className="mt-4 flex gap-3">
+                  <button onClick={() => setConfirmReplace(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{d.cancel}</button>
+                  <button onClick={() => startUpload(confirmReplace)} disabled={uploading} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
+                    {uploading ? d.replacing : d.replace}
+                  </button>
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-slate-600">
-              {format(d.replaceConfirm, { n: confirmReplace.topics.length, word: topicWord(confirmReplace.topics.length, d) })}
-              {" "}{d.replaceNote}
-            </p>
-            <div className="mt-4 flex gap-3">
-              <button onClick={() => setConfirmReplace(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{d.cancel}</button>
-              <button onClick={() => startUpload(confirmReplace)} disabled={uploading} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
-                {uploading ? d.replacing : d.replace}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </ModalPortal>
+        )}
+      </div>
+    </ModalPortal>
   );
 }

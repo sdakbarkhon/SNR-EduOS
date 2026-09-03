@@ -16,6 +16,7 @@ import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X, Search, Sparkles
 import { cn } from "@/lib/cn";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { useSchoolNow } from "@/components/SchoolTimeProvider";
+import { ModalPortal } from "@/components/ModalPortal";
 
 // 26.08.2026: у сдач появились оценки. Без них очередь проверки не могла
 // отличить проверенную работу от непроверенной — см. utils/reviewQueue.
@@ -100,23 +101,25 @@ function CardMenu({ hw, onDelete, onDuplicate }: {
       </div>
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setConfirmDelete(false)}
-          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
-          <div className="w-full max-w-sm rounded-[24px] bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-start justify-between">
-              <h3 className="text-[16px] font-bold text-brand-ink">Удалить задание?</h3>
-              <button onClick={() => setConfirmDelete(false)} className="rounded-lg p-1 text-gray-400 hover:bg-slate-100"><X size={16} /></button>
-            </div>
-            <p className="mb-4 text-[13px] text-brand-ink-muted">«{hw.title}» и все сдачи будут удалены безвозвратно.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setConfirmDelete(false)}
-                className="flex-1 rounded-[12px] border border-slate-200 py-2.5 text-[14px] font-semibold text-brand-ink hover:bg-slate-50">Отмена</button>
-              <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); onDelete(); }}
-                className="flex-1 rounded-[12px] bg-red-500 py-2.5 text-[14px] font-bold text-white hover:bg-red-600">Удалить</button>
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => setConfirmDelete(false)}
+            style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
+            <div className="w-full max-w-sm rounded-[24px] bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-start justify-between">
+                <h3 className="text-[16px] font-bold text-brand-ink">Удалить задание?</h3>
+                <button onClick={() => setConfirmDelete(false)} className="rounded-lg p-1 text-gray-400 hover:bg-slate-100"><X size={16} /></button>
+              </div>
+              <p className="mb-4 text-[13px] text-brand-ink-muted">«{hw.title}» и все сдачи будут удалены безвозвратно.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmDelete(false)}
+                  className="flex-1 rounded-[12px] border border-slate-200 py-2.5 text-[14px] font-semibold text-brand-ink hover:bg-slate-50">Отмена</button>
+                <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); onDelete(); }}
+                  className="flex-1 rounded-[12px] bg-red-500 py-2.5 text-[14px] font-bold text-white hover:bg-red-600">Удалить</button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </>
   );

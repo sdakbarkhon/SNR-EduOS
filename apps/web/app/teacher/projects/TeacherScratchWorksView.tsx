@@ -8,6 +8,7 @@ import { IframeSandbox } from "@/app/(app)/projects/SandboxView";
 import { sandboxToolById } from "@/lib/sandbox-tools";
 import { FROM_PLATFORM, postToScratch } from "@/lib/scratch-bridge";
 import { getClassScratchProjectUrl, type ClassScratchWork } from "@/app/(app)/projects/scratch/actions";
+import { ModalPortal } from "@/components/ModalPortal";
 
 /**
  * Работы Scratch классов учителя. Вкладка внутри «Проектов»: ученик находит
@@ -188,28 +189,30 @@ export function TeacherScratchWorksView({ works }: { works: ClassScratchWork[] }
       )}
 
       {open && (
-        <div className="fixed inset-0 z-[9999] flex flex-col bg-black/70 p-3 sm:p-6">
-          <div className="flex items-center justify-between gap-3 rounded-t-2xl bg-white px-4 py-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-brand-ink">{open.name}</p>
-              <p className="truncate text-xs text-gray-500">
-                {open.studentName}{open.groupName ? ` · ${open.groupName}` : ""}
-              </p>
+        <ModalPortal>
+          <div className="fixed inset-0 z-[9999] flex flex-col bg-black/70 p-3 sm:p-6">
+            <div className="flex items-center justify-between gap-3 rounded-t-2xl bg-white px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-brand-ink">{open.name}</p>
+                <p className="truncate text-xs text-gray-500">
+                  {open.studentName}{open.groupName ? ` · ${open.groupName}` : ""}
+                </p>
+              </div>
+              <button
+                onClick={() => setOpen(null)}
+                className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
+              >
+                <X className="h-3.5 w-3.5" /> {t.scratchClose}
+              </button>
             </div>
-            <button
-              onClick={() => setOpen(null)}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
-            >
-              <X className="h-3.5 w-3.5" /> {t.scratchClose}
-            </button>
+            <div className="bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
+              {t.scratchViewOnly}
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden rounded-b-2xl bg-white">
+              <IframeSandbox tool={sandboxToolById("scratch")!} name="Scratch" frameRef={frameRef} />
+            </div>
           </div>
-          <div className="bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
-            {t.scratchViewOnly}
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden rounded-b-2xl bg-white">
-            <IframeSandbox tool={sandboxToolById("scratch")!} name="Scratch" frameRef={frameRef} />
-          </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

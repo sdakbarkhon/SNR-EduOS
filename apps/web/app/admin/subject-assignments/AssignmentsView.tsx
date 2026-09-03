@@ -19,6 +19,7 @@ import {
   actionApplyBulkAssignment,
 } from "../actions";
 import type { BulkAssignPlan, BulkAssignResult } from "@/lib/admin-api";
+import { ModalPortal } from "@/components/ModalPortal";
 
 // Z.2.2 — «кто что где ведёт». Одна строка = один предмет в одной группе с
 // одним учителем.
@@ -398,314 +399,320 @@ export function AssignmentsView({
 
       {/* Add / Edit */}
       {(modal.mode === "add" || modal.mode === "edit") && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 p-5">
-              <h2 className="text-lg font-semibold text-zinc-900">
-                {modal.mode === "add" ? d.assignmentsAdd : d.assignmentsEdit}
-              </h2>
-              <button onClick={() => setModal({ mode: "none" })} className="rounded-lg p-1 text-zinc-400 hover:text-zinc-700">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-700">{d.assignmentsSubject}</label>
-                <select
-                  value={formCatalogId}
-                  onChange={(e) => setFormCatalogId(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                >
-                  <option value="">{d.assignmentsPickSubject}</option>
-                  {pickerCatalog.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}{c.is_active ? "" : ` (${d.subjectsHiddenBadge})`}
-                    </option>
-                  ))}
-                  <option value={NEW_SUBJECT}>+ {d.assignmentsCreateSubject}</option>
-                </select>
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-zinc-100 p-5">
+                <h2 className="text-lg font-semibold text-zinc-900">
+                  {modal.mode === "add" ? d.assignmentsAdd : d.assignmentsEdit}
+                </h2>
+                <button onClick={() => setModal({ mode: "none" })} className="rounded-lg p-1 text-zinc-400 hover:text-zinc-700">
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              {formCatalogId === NEW_SUBJECT && (
+              <div className="space-y-4 p-5">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsName}</label>
-                  <input
-                    type="text"
-                    value={formNewName}
-                    onChange={(e) => setFormNewName(e.target.value)}
-                    placeholder="Астрономия"
-                    autoFocus
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                  <p className="mt-1 text-xs text-zinc-500">{d.assignmentsCreateSubjectHint}</p>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">{d.assignmentsSubject}</label>
+                  <select
+                    value={formCatalogId}
+                    onChange={(e) => setFormCatalogId(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    <option value="">{d.assignmentsPickSubject}</option>
+                    {pickerCatalog.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.is_active ? "" : ` (${d.subjectsHiddenBadge})`}
+                      </option>
+                    ))}
+                    <option value={NEW_SUBJECT}>+ {d.assignmentsCreateSubject}</option>
+                  </select>
                 </div>
-              )}
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-700">{d.fieldGroup}</label>
-                <select
-                  value={formGroupId}
-                  onChange={(e) => setFormGroupId(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                >
-                  <option value="">{d.assignmentsPickGroup}</option>
-                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
+                {formCatalogId === NEW_SUBJECT && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsName}</label>
+                    <input
+                      type="text"
+                      value={formNewName}
+                      onChange={(e) => setFormNewName(e.target.value)}
+                      placeholder="Астрономия"
+                      autoFocus
+                      className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                    <p className="mt-1 text-xs text-zinc-500">{d.assignmentsCreateSubjectHint}</p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">{d.fieldGroup}</label>
+                  <select
+                    value={formGroupId}
+                    onChange={(e) => setFormGroupId(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    <option value="">{d.assignmentsPickGroup}</option>
+                    {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsTeacher}</label>
+                  <select
+                    value={formTeacherId}
+                    onChange={(e) => setFormTeacherId(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    <option value="">{d.subjectsNotAssigned}</option>
+                    {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                  </select>
+                  <p className="mt-1 flex items-start gap-1.5 text-xs text-zinc-500">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {d.assignmentsTeacherChatsHint}
+                  </p>
+                </div>
+
+                {formError && <p className="text-sm text-red-600">{formError}</p>}
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsTeacher}</label>
-                <select
-                  value={formTeacherId}
-                  onChange={(e) => setFormTeacherId(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
+                <button
+                  onClick={() => setModal({ mode: "none" })}
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100"
                 >
-                  <option value="">{d.subjectsNotAssigned}</option>
-                  {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-                </select>
-                <p className="mt-1 flex items-start gap-1.5 text-xs text-zinc-500">
-                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  {d.assignmentsTeacherChatsHint}
-                </p>
+                  {d.cancelBtn}
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isPending}
+                  className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+                >
+                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  {d.saveBtn}
+                </button>
               </div>
-
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
-            </div>
-
-            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
-              <button
-                onClick={() => setModal({ mode: "none" })}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100"
-              >
-                {d.cancelBtn}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isPending}
-                className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
-              >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                {d.saveBtn}
-              </button>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* ── МАССОВОЕ НАЗНАЧЕНИЕ ─────────────────────────────────────── */}
       {bulkOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 p-5">
-              <h2 className="text-lg font-semibold text-zinc-900">{d.assignmentsBulkTitle}</h2>
-              <button
-                onClick={() => setBulkOpen(false)}
-                disabled={bulkBusy}
-                className="rounded-lg p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-50"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-              <p className="text-xs leading-relaxed text-zinc-500">{d.assignmentsBulkHint}</p>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-700">{d.assignmentsBulkTeacher}</label>
-                <select
-                  value={bulkTeacher}
-                  onChange={(e) => { setBulkTeacher(e.target.value); сбросРасчёт(); }}
-                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-zinc-100 p-5">
+                <h2 className="text-lg font-semibold text-zinc-900">{d.assignmentsBulkTitle}</h2>
+                <button
+                  onClick={() => setBulkOpen(false)}
+                  disabled={bulkBusy}
+                  className="rounded-lg p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-50"
                 >
-                  {/* «Не назначен» оставлен намеренно: так одной пачкой можно
-                      завести предмет во все группы и раздать учителей потом.
-                      Чатов при этом не будет ни одного — оба триггера выходят
-                      первой строкой при пустом учителе. */}
-                  <option value="">{d.subjectsNotAssigned}</option>
-                  {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-                </select>
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              <ВыборГалочками
-                title={format(d.assignmentsBulkSubjects, { n: bulkSubjects.size })}
-                items={activeCatalog.map((c) => ({ id: c.id, label: c.name }))}
-                picked={bulkSubjects}
-                onToggle={переключить(bulkSubjects, setBulkSubjects)}
-                onAll={() => { setBulkSubjects(new Set(activeCatalog.map((c) => c.id))); сбросРасчёт(); }}
-                onNone={() => { setBulkSubjects(new Set()); сбросРасчёт(); }}
-                allLabel={d.assignmentsBulkSelectAll}
-                noneLabel={d.assignmentsBulkClear}
-              />
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+                <p className="text-xs leading-relaxed text-zinc-500">{d.assignmentsBulkHint}</p>
 
-              <ВыборГалочками
-                title={format(d.assignmentsBulkGroups, { n: bulkGroups.size })}
-                items={groups.map((g) => ({ id: g.id, label: g.name }))}
-                picked={bulkGroups}
-                onToggle={переключить(bulkGroups, setBulkGroups)}
-                onAll={() => { setBulkGroups(new Set(groups.map((g) => g.id))); сбросРасчёт(); }}
-                onNone={() => { setBulkGroups(new Set()); сбросРасчёт(); }}
-                allLabel={d.assignmentsBulkSelectAll}
-                noneLabel={d.assignmentsBulkClear}
-              />
-
-              {/* ── ЧТО ПРОИЗОЙДЁТ. Показывается ДО согласия ───────────── */}
-              {bulkPlan && (
-                <div className="space-y-1.5 rounded-xl border border-violet-100 bg-violet-50/50 p-3 text-xs">
-                  <div className="font-semibold text-violet-900">{d.assignmentsBulkPlanTitle}</div>
-                  {bulkPlan.willCreate === 0 && bulkPlan.willAssign === 0 ? (
-                    <p className="text-amber-700">{d.assignmentsBulkPlanNothing}</p>
-                  ) : (
-                    <>
-                      {bulkPlan.willCreate > 0 && (
-                        <p className="text-zinc-700">{format(d.assignmentsBulkPlanCreate, { n: bulkPlan.willCreate })}</p>
-                      )}
-                      {bulkPlan.willAssign > 0 && (
-                        <p className="text-zinc-700">{format(d.assignmentsBulkPlanAssign, { n: bulkPlan.willAssign })}</p>
-                      )}
-                      {bulkPlan.chats.teacherHasNoAccount ? (
-                        <p className="text-amber-700">{d.assignmentsBulkPlanNoAccount}</p>
-                      ) : bulkPlan.chats.newThreads > 0 ? (
-                        <p className="text-zinc-700">
-                          {format(d.assignmentsBulkPlanChats, {
-                            threads: bulkPlan.chats.newThreads,
-                            participants: bulkPlan.chats.newParticipants,
-                          })}
-                        </p>
-                      ) : (
-                        <p className="text-zinc-500">{d.assignmentsBulkPlanNoChats}</p>
-                      )}
-                      {/* Тихий ноль называется вслух: эти чаты не заведутся, и
-                          без этой строки никто бы не узнал. */}
-                      {bulkPlan.chats.silentStudents > 0 && (
-                        <p className="text-amber-700">
-                          {format(d.assignmentsBulkPlanSilent, { n: bulkPlan.chats.silentStudents })}
-                        </p>
-                      )}
-                    </>
-                  )}
-                  {bulkPlan.blocked.length > 0 && (
-                    <div className="mt-2 border-t border-violet-100 pt-2">
-                      <div className="font-semibold text-zinc-600">
-                        {format(d.assignmentsBulkOccupied, { n: bulkPlan.blocked.length })}
-                      </div>
-                      <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
-                        {bulkPlan.blocked.map((b) => (
-                          <li key={`${b.catalogId}-${b.groupId}`} className="text-zinc-500">
-                            {b.reason === "already_this_teacher"
-                              ? format(d.assignmentsBulkAlready, { subject: b.subjectName, group: b.groupName })
-                              : format(d.assignmentsBulkOccupiedBy, {
-                                  subject: b.subjectName, group: b.groupName, teacher: b.teacherName ?? "—",
-                                })}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">{d.assignmentsBulkTeacher}</label>
+                  <select
+                    value={bulkTeacher}
+                    onChange={(e) => { setBulkTeacher(e.target.value); сбросРасчёт(); }}
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    {/* «Не назначен» оставлен намеренно: так одной пачкой можно
+                        завести предмет во все группы и раздать учителей потом.
+                        Чатов при этом не будет ни одного — оба триггера выходят
+                        первой строкой при пустом учителе. */}
+                    <option value="">{d.subjectsNotAssigned}</option>
+                    {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                  </select>
                 </div>
-              )}
 
-              {/* ── ЧТО ПОЛУЧИЛОСЬ. Обе правды сразу ──────────────────── */}
-              {bulkResult && (
-                <div className="space-y-1.5 rounded-xl bg-emerald-50 p-3 text-xs">
-                  <p className="font-semibold text-emerald-800">
-                    {format(d.assignmentsBulkDone, { created: bulkResult.created, assigned: bulkResult.assigned })}
-                  </p>
-                  {bulkResult.failed.length > 0 && (
-                    <div className="border-t border-emerald-100 pt-1.5">
-                      <div className="font-semibold text-red-700">
-                        {format(d.assignmentsBulkFailedTitle, { n: bulkResult.failed.length })}
-                      </div>
-                      <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
-                        {bulkResult.failed.map((f, i) => (
-                          <li key={i} className="text-red-600">
-                            {format(d.assignmentsBulkFailedRow, {
-                              subject: f.subjectName, group: f.groupName, reason: f.reason,
+                <ВыборГалочками
+                  title={format(d.assignmentsBulkSubjects, { n: bulkSubjects.size })}
+                  items={activeCatalog.map((c) => ({ id: c.id, label: c.name }))}
+                  picked={bulkSubjects}
+                  onToggle={переключить(bulkSubjects, setBulkSubjects)}
+                  onAll={() => { setBulkSubjects(new Set(activeCatalog.map((c) => c.id))); сбросРасчёт(); }}
+                  onNone={() => { setBulkSubjects(new Set()); сбросРасчёт(); }}
+                  allLabel={d.assignmentsBulkSelectAll}
+                  noneLabel={d.assignmentsBulkClear}
+                />
+
+                <ВыборГалочками
+                  title={format(d.assignmentsBulkGroups, { n: bulkGroups.size })}
+                  items={groups.map((g) => ({ id: g.id, label: g.name }))}
+                  picked={bulkGroups}
+                  onToggle={переключить(bulkGroups, setBulkGroups)}
+                  onAll={() => { setBulkGroups(new Set(groups.map((g) => g.id))); сбросРасчёт(); }}
+                  onNone={() => { setBulkGroups(new Set()); сбросРасчёт(); }}
+                  allLabel={d.assignmentsBulkSelectAll}
+                  noneLabel={d.assignmentsBulkClear}
+                />
+
+                {/* ── ЧТО ПРОИЗОЙДЁТ. Показывается ДО согласия ───────────── */}
+                {bulkPlan && (
+                  <div className="space-y-1.5 rounded-xl border border-violet-100 bg-violet-50/50 p-3 text-xs">
+                    <div className="font-semibold text-violet-900">{d.assignmentsBulkPlanTitle}</div>
+                    {bulkPlan.willCreate === 0 && bulkPlan.willAssign === 0 ? (
+                      <p className="text-amber-700">{d.assignmentsBulkPlanNothing}</p>
+                    ) : (
+                      <>
+                        {bulkPlan.willCreate > 0 && (
+                          <p className="text-zinc-700">{format(d.assignmentsBulkPlanCreate, { n: bulkPlan.willCreate })}</p>
+                        )}
+                        {bulkPlan.willAssign > 0 && (
+                          <p className="text-zinc-700">{format(d.assignmentsBulkPlanAssign, { n: bulkPlan.willAssign })}</p>
+                        )}
+                        {bulkPlan.chats.teacherHasNoAccount ? (
+                          <p className="text-amber-700">{d.assignmentsBulkPlanNoAccount}</p>
+                        ) : bulkPlan.chats.newThreads > 0 ? (
+                          <p className="text-zinc-700">
+                            {format(d.assignmentsBulkPlanChats, {
+                              threads: bulkPlan.chats.newThreads,
+                              participants: bulkPlan.chats.newParticipants,
                             })}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
+                          </p>
+                        ) : (
+                          <p className="text-zinc-500">{d.assignmentsBulkPlanNoChats}</p>
+                        )}
+                        {/* Тихий ноль называется вслух: эти чаты не заведутся, и
+                            без этой строки никто бы не узнал. */}
+                        {bulkPlan.chats.silentStudents > 0 && (
+                          <p className="text-amber-700">
+                            {format(d.assignmentsBulkPlanSilent, { n: bulkPlan.chats.silentStudents })}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {bulkPlan.blocked.length > 0 && (
+                      <div className="mt-2 border-t border-violet-100 pt-2">
+                        <div className="font-semibold text-zinc-600">
+                          {format(d.assignmentsBulkOccupied, { n: bulkPlan.blocked.length })}
+                        </div>
+                        <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
+                          {bulkPlan.blocked.map((b) => (
+                            <li key={`${b.catalogId}-${b.groupId}`} className="text-zinc-500">
+                              {b.reason === "already_this_teacher"
+                                ? format(d.assignmentsBulkAlready, { subject: b.subjectName, group: b.groupName })
+                                : format(d.assignmentsBulkOccupiedBy, {
+                                    subject: b.subjectName, group: b.groupName, teacher: b.teacherName ?? "—",
+                                  })}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              {bulkError && (
-                <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  {bulkError}
-                </p>
-              )}
-            </div>
+                {/* ── ЧТО ПОЛУЧИЛОСЬ. Обе правды сразу ──────────────────── */}
+                {bulkResult && (
+                  <div className="space-y-1.5 rounded-xl bg-emerald-50 p-3 text-xs">
+                    <p className="font-semibold text-emerald-800">
+                      {format(d.assignmentsBulkDone, { created: bulkResult.created, assigned: bulkResult.assigned })}
+                    </p>
+                    {bulkResult.failed.length > 0 && (
+                      <div className="border-t border-emerald-100 pt-1.5">
+                        <div className="font-semibold text-red-700">
+                          {format(d.assignmentsBulkFailedTitle, { n: bulkResult.failed.length })}
+                        </div>
+                        <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
+                          {bulkResult.failed.map((f, i) => (
+                            <li key={i} className="text-red-600">
+                              {format(d.assignmentsBulkFailedRow, {
+                                subject: f.subjectName, group: f.groupName, reason: f.reason,
+                              })}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
-              <button
-                onClick={() => setBulkOpen(false)}
-                disabled={bulkBusy}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50"
-              >
-                {d.cancelBtn}
-              </button>
-              {/* Кнопка «Назначить» появляется ТОЛЬКО после расчёта и только
-                  если делать есть что. Так человек не может согласиться на
-                  то, чего не видел, — тот же порядок, что у массового
-                  создания уроков. */}
-              {bulkPlan && (bulkPlan.willCreate > 0 || bulkPlan.willAssign > 0) ? (
+                {bulkError && (
+                  <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    {bulkError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
                 <button
-                  onClick={handleBulkApply}
+                  onClick={() => setBulkOpen(false)}
                   disabled={bulkBusy}
-                  className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50"
                 >
-                  {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                  {bulkBusy ? d.assignmentsBulkApplying : d.assignmentsBulkApply}
+                  {d.cancelBtn}
                 </button>
-              ) : (
-                <button
-                  onClick={handleBulkPlan}
-                  disabled={bulkBusy}
-                  className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
-                >
-                  {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
-                  {bulkBusy ? d.assignmentsBulkCounting : bulkPlan ? d.assignmentsBulkRecount : d.assignmentsBulkPlanTitle}
-                </button>
-              )}
+                {/* Кнопка «Назначить» появляется ТОЛЬКО после расчёта и только
+                    если делать есть что. Так человек не может согласиться на
+                    то, чего не видел, — тот же порядок, что у массового
+                    создания уроков. */}
+                {bulkPlan && (bulkPlan.willCreate > 0 || bulkPlan.willAssign > 0) ? (
+                  <button
+                    onClick={handleBulkApply}
+                    disabled={bulkBusy}
+                    className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+                  >
+                    {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                    {bulkBusy ? d.assignmentsBulkApplying : d.assignmentsBulkApply}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleBulkPlan}
+                    disabled={bulkBusy}
+                    className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+                  >
+                    {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
+                    {bulkBusy ? d.assignmentsBulkCounting : bulkPlan ? d.assignmentsBulkRecount : d.assignmentsBulkPlanTitle}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Delete */}
       {modal.mode === "delete" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="mb-2 text-lg font-semibold text-zinc-900">{d.assignmentsDeleteTitle}</h2>
-            <p className="mb-1 text-sm text-zinc-600">
-              {d.assignmentsDeleteConfirm
-                .replace("{name}", modal.row.name)
-                .replace("{group}", modal.row.group?.name ?? "")}
-            </p>
-            <p className="mb-5 text-sm text-red-600">{d.assignmentsDeleteWarning}</p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setModal({ mode: "none" })}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"
-              >
-                {d.cancelBtn}
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isPending}
-                className={cn(
-                  "flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700",
-                  isPending && "opacity-60",
-                )}
-              >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                {d.deleteBtn}
-              </button>
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+              <h2 className="mb-2 text-lg font-semibold text-zinc-900">{d.assignmentsDeleteTitle}</h2>
+              <p className="mb-1 text-sm text-zinc-600">
+                {d.assignmentsDeleteConfirm
+                  .replace("{name}", modal.row.name)
+                  .replace("{group}", modal.row.group?.name ?? "")}
+              </p>
+              <p className="mb-5 text-sm text-red-600">{d.assignmentsDeleteWarning}</p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setModal({ mode: "none" })}
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"
+                >
+                  {d.cancelBtn}
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isPending}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700",
+                    isPending && "opacity-60",
+                  )}
+                >
+                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  {d.deleteBtn}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

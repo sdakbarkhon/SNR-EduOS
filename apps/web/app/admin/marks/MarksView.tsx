@@ -5,6 +5,7 @@ import { Search, Pencil, X, Check } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { updateMark, type MarkKind } from "./actions";
+import { ModalPortal } from "@/components/ModalPortal";
 
 export type MarkRow = {
   id: string;
@@ -214,86 +215,88 @@ function EditDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
-          <p className="text-sm font-bold text-gray-800">{labels.editTitle}</p>
-          <button onClick={onClose} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4 p-5">
-          <div className="rounded-xl bg-gray-50 px-3 py-2.5 text-xs text-gray-600">
-            <p className="font-semibold text-gray-800">{row.student}</p>
-            <p className="mt-0.5">{labels.kind} · {row.groupName ?? "—"} · {row.subject ?? "—"}</p>
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+        <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+            <p className="text-sm font-bold text-gray-800">{labels.editTitle}</p>
+            <button onClick={onClose} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100">
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">{labels.newValue}</p>
-            {row.kind === "attendance" ? (
-              <div className="space-y-1.5">
-                {ATT.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setNext(s)}
-                    className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
-                      next === s ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {labels.att[s]}
-                  </button>
-                ))}
-              </div>
-            ) : row.kind === "test" ? (
-              // type="number" пропускает «e», «+» и «-»: браузер считает их
-              // частью числа, поле после них отдаёт пустоту, и админ видит
-              // молчаливо несохранённый балл. Здесь принимаются только цифры —
-              // всё остальное просто не вводится.
-              <input
-                type="text"
-                inputMode="numeric"
-                value={next}
-                onChange={(e) => setNext(e.target.value.replace(/\D/g, "").slice(0, 3))}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-violet-300"
-              />
-            ) : (
-              <div className="flex gap-2">
-                {[2, 3, 4, 5].map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => setNext(String(g))}
-                    className={`h-11 flex-1 rounded-xl text-base font-bold transition-colors ${
-                      Number(next) === g ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <div className="space-y-4 p-5">
+            <div className="rounded-xl bg-gray-50 px-3 py-2.5 text-xs text-gray-600">
+              <p className="font-semibold text-gray-800">{row.student}</p>
+              <p className="mt-0.5">{labels.kind} · {row.groupName ?? "—"} · {row.subject ?? "—"}</p>
+            </div>
 
-          {error && <p className="text-xs font-medium text-red-600">{labels.failed}</p>}
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">{labels.newValue}</p>
+              {row.kind === "attendance" ? (
+                <div className="space-y-1.5">
+                  {ATT.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setNext(s)}
+                      className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                        next === s ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {labels.att[s]}
+                    </button>
+                  ))}
+                </div>
+              ) : row.kind === "test" ? (
+                // type="number" пропускает «e», «+» и «-»: браузер считает их
+                // частью числа, поле после них отдаёт пустоту, и админ видит
+                // молчаливо несохранённый балл. Здесь принимаются только цифры —
+                // всё остальное просто не вводится.
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={next}
+                  onChange={(e) => setNext(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-violet-300"
+                />
+              ) : (
+                <div className="flex gap-2">
+                  {[2, 3, 4, 5].map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => setNext(String(g))}
+                      className={`h-11 flex-1 rounded-xl text-base font-bold transition-colors ${
+                        Number(next) === g ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-200"
-            >
-              {labels.cancel}
-            </button>
-            <button
-              onClick={save}
-              disabled={pending}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
-            >
-              <Check className="h-4 w-4" />
-              {labels.save}
-            </button>
+            {error && <p className="text-xs font-medium text-red-600">{labels.failed}</p>}
+
+            <div className="flex gap-2">
+              <button
+                onClick={onClose}
+                className="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+              >
+                {labels.cancel}
+              </button>
+              <button
+                onClick={save}
+                disabled={pending}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+              >
+                <Check className="h-4 w-4" />
+                {labels.save}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

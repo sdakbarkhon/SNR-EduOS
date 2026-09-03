@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 
 /**
  * Обёртка для модалок/шторок родителя: портал в document.body + слой ВЫШЕ
@@ -30,9 +28,15 @@ export const Z_TAB_BAR = 50;
 export const Z_MODAL = 100;
 export const Z_MODAL_PANEL = 110;
 
-export function ModalPortal({ children }: { children: ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
-  return createPortal(children, document.body);
-}
+/**
+ * 03.09.2026 — ТЕЛО ПЕРЕЕХАЛО В components/ModalPortal.tsx.
+ *
+ * Здесь лежала своя реализация портала, слово в слово такая же. Пока она была
+ * одна на две страницы родителя, это было незаметно; когда порталом пришлось
+ * накрыть ещё пятнадцать файлов в остальном продукте, две одинаковые обёртки
+ * стали началом той самой истории, в которой копии расходятся.
+ *
+ * Шкала слоёв остаётся ЗДЕСЬ: она про родительский каркас с плавающим
+ * таб-баром, и общему компоненту про него знать незачем.
+ */
+export { ModalPortal } from "@/components/ModalPortal";
