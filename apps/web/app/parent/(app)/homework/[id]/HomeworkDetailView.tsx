@@ -35,6 +35,8 @@ import {
   ScreenBody,
   SubjectSquare,
 } from "../../_study/parts";
+import { StatusText, SentWithStatus } from "../../_study/StatusText";
+import type { HomeworkStatusKind } from "../../_study/homework-status";
 import { DIVIDER } from "../../_ui/screen-tokens";
 import { DateText } from "../../_ui/dates";
 import { accentGrad, chip, ink1, ink2, ink3, status, type StatusKey } from "../../v2/tokens";
@@ -114,7 +116,7 @@ export function HomeworkDetailView({
   color,
   title,
   description,
-  statusLabel,
+  statusKind,
   family,
   gradeDisplay,
   dueAt,
@@ -133,7 +135,9 @@ export function HomeworkDetailView({
   color: string;
   title: string;
   description: string | null;
-  statusLabel: string;
+  /** Ключ состояния: слово рисует клиентский <StatusText/> — оно зависит
+   *  от языка, а этот экран серверный. */
+  statusKind: HomeworkStatusKind;
   family: StatusKey;
   gradeDisplay: string | null;
   /** ISO срока или null — подпись собирает клиентский <DateText/>. */
@@ -180,7 +184,7 @@ export function HomeworkDetailView({
                   {title}
                 </span>
               </span>
-              <MiniChip label={statusLabel} family={family} />
+              <MiniChip label={<StatusText kind={statusKind} grade={gradeDisplay} />} family={family} />
             </div>
             <div
               className="flex flex-wrap items-center"
@@ -437,7 +441,7 @@ export function HomeworkDetailView({
           >
             <IconCheck size={15} color={st.text} strokeWidth={2.2} />
             <span style={{ fontSize: 12.5, fontWeight: 800, color: st.text }}>
-              Работа отправлена · {statusLabel}
+              <SentWithStatus kind={statusKind} grade={gradeDisplay} />
             </span>
           </div>
         )}

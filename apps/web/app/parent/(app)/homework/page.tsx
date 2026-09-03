@@ -6,7 +6,6 @@ import {
   homeworkStatusKind,
   progressIndicator,
   statusFamily,
-  statusLabel,
 } from "../_study/homework-status";
 import { subjectColor, subjectGlyph } from "../_study/util";
 import { addDaysKey, tashkentDateKey } from "../_ui/format";
@@ -57,7 +56,11 @@ export default async function ParentHomeworkPage() {
       color: subjectColor(hw.subjectColor),
       title: hw.title,
       due,
-      statusLabel: statusLabel(kind, grade),
+      // Подпись состояния, как и подпись срока рядом, собирает КЛИЕНТ:
+      // слова зависят от языка, а эта страница серверная. Отсюда уезжает
+      // только ключ состояния и оценка.
+      statusKind: kind,
+      gradeDisplay: grade,
       family: statusFamily(kind, overdue),
       progress: progressIndicator(hw),
       overdue,

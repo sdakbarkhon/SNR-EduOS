@@ -6,7 +6,6 @@ import {
   homeworkGradeDisplay,
   homeworkStatusKind,
   statusFamily,
-  statusLabel,
 } from "../../_study/homework-status";
 import { fileExtLabel, fileSizeLabel, initials, subjectColor, subjectGlyph } from "../../_study/util";
 
@@ -49,7 +48,7 @@ export default async function ParentHomeworkDetailPage({
       color={subjectColor(hw.subjectColor)}
       title={hw.title}
       description={hw.description}
-      statusLabel={statusLabel(kind, grade)}
+      statusKind={kind}
       family={family}
       gradeDisplay={grade}
       dueAt={hw.due_date}

@@ -20,6 +20,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { InnerHeader, GlassCircle } from "../_study/InnerHeader";
+import { statusLabel, type HomeworkStatusKind } from "../_study/homework-status";
+import { useStatusWords } from "../_study/StatusText";
 import {
   COL_DIVIDER,
   ChildCard,
@@ -76,7 +78,10 @@ export type HomeworkCardVM = {
   title: string;
   /** Что показать в подписи срока — сама строка собирается в клиенте. */
   due: HomeworkDue;
-  statusLabel: string;
+  /** Ключ состояния и оценка: слово собирается здесь, в клиенте, из словаря —
+   *  оно зависит от языка, а страница-источник серверная. */
+  statusKind: HomeworkStatusKind;
+  gradeDisplay: string | null;
   family: StatusKey;
   progress: number | "hourglass" | null;
   overdue: boolean;
@@ -133,6 +138,8 @@ function FilterChip({
 
 function HomeworkCard({ card }: { card: HomeworkCardVM }) {
   const dueLabel = useDueLabel();
+  // Слова состояния — тем же способом, что и слова срока строкой выше.
+  const statusWords = useStatusWords();
   const st = status[card.family];
   const emphasize = card.family === "orange" || card.family === "red";
   const metaColor = emphasize ? st.text : ink3;
@@ -159,7 +166,10 @@ function HomeworkCard({ card }: { card: HomeworkCardVM }) {
             <span className="truncate" style={{ fontSize: 12.5, fontWeight: 800, color: ink1 }}>
               {card.subjectName}
             </span>
-            <MiniChip label={card.statusLabel} family={card.family} />
+            <MiniChip
+              label={statusLabel(card.statusKind, card.gradeDisplay, statusWords)}
+              family={card.family}
+            />
           </span>
           <span className="line-clamp-2" style={{ fontSize: 10.5, fontWeight: 600, color: ink2 }}>
             {card.title}

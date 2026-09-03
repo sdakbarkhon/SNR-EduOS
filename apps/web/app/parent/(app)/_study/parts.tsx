@@ -82,7 +82,9 @@ export function MiniChip({
   family = "gray",
   dot = false,
 }: {
-  label: string;
+  /** Не только строка: подпись состояния приезжает клиентским <StatusText/> —
+   *  слово зависит от языка, а страницы раздела серверные. */
+  label: ReactNode;
   family?: StatusKey;
   /** Точка-индикатор 5px слева («Идёт сейчас», макет 3522). */
   dot?: boolean;

@@ -1,16 +1,34 @@
 /**
  * Блок 7.2 — статус домашнего задания глазами РОДИТЕЛЯ.
  *
- * Перенос логики apps/mobile-parent/src/lib/homeworkStatus.ts (ветка
- * feat/mobile-parent-redesign): три состояния вместо четырёх «ученических»
- * (в родительском приложении нет «В работе» — это состояние ученика, а не
- * факт для родителя), плюс числовая оценка отдельным полем.
+ * Три состояния вместо четырёх «ученических»: в родительском приложении нет
+ * «В работе» — это состояние УЧЕНИКА, а не факт для родителя. Решение
+ * подтверждено заказчиком 03.09.2026 и остаётся в силе.
  *
  * Источники правды по типам заданий:
  *   content_type === 'test' → test_submissions (score / max_score),
  *   всё остальное           → homework_submissions.status + grade.
+ *
+ * ═══ 03.09.2026, пункт 122 — КОПИИ ПРАВИЛА БОЛЬШЕ НЕТ ═════════════════════
+ *
+ * Здесь лежала СВОЯ реализация «статус сдачи → одно из трёх состояний»,
+ * слово в слово повторявшая `homeworkSubmissionStatusKind` из packages/core.
+ * Две одинаковые функции об одном факте — ровно та беда, на которой в этом
+ * проекте правила расходились семь раз: почини одну, забудь вторую.
+ *
+ * Теперь `submissionStatusKind` — тонкая обёртка над общей функцией. Тот же
+ * приём, каким сводили три копии `verifyAdmin` в один `verifyStaff`.
+ * Мобильное родительское приложение зовёт ту же общую функцию через
+ * `realSubmissionStatusKind` — то есть три родительских поверхности
+ * (веб, мобильное, общий слой) отвечают одной строкой кода.
+ *
+ * ПОДПИСИ ПЕРЕЕХАЛИ В СЛОВАРЬ. Здесь же были зашиты русские «Не сдано»,
+ * «На проверке» и «Оценено» — экран не менялся с языком, хотя языка в
+ * проекте три. Строка теперь собирается в клиенте по ключу состояния, как
+ * рядом уже собирается подпись срока.
  */
 
+import { homeworkSubmissionStatusKind } from "@snr/core";
 import type { HomeworkSubmission, HomeworkWithSubmission, TestSubmission } from "@snr/core";
 import type { StatusKey } from "../v2/tokens";
 
@@ -22,10 +40,10 @@ export function testStatusKind(test: TestSubmission | null): HomeworkStatusKind 
 }
 
 export function submissionStatusKind(sub: HomeworkSubmission | null): HomeworkStatusKind {
-  if (!sub) return "not_submitted";
-  if (sub.status === "graded") return "graded";
-  if (sub.status === "submitted" || sub.status === "checking") return "pending_review";
-  return "not_submitted"; // in_progress — ученик ещё не отправил
+  // Общая функция даёт ровно те же три состояния и так же считает
+  // `in_progress` несданным: ученик ещё не отправил работу, и родителю про
+  // его черновик знать нечего.
+  return homeworkSubmissionStatusKind(sub?.status ?? null);
 }
 
 export function homeworkStatusKind(hw: HomeworkWithSubmission): HomeworkStatusKind {
@@ -44,10 +62,22 @@ export function homeworkGradeDisplay(hw: HomeworkWithSubmission): string | null 
   return hw.submission?.grade != null ? String(hw.submission.grade) : null;
 }
 
-export function statusLabel(kind: HomeworkStatusKind, grade: string | null): string {
-  if (kind === "graded") return grade ? `Оценено · ${grade}` : "Оценено";
-  if (kind === "pending_review") return "На проверке";
-  return "Не сдано";
+/**
+ * Подпись состояния. Слова берутся из словаря — их три языка, а этот файл
+ * серверный и локали не знает; поэтому сюда передаётся уже готовый набор
+ * (`d.parentApp.status`), а собирает строку клиентский компонент.
+ *
+ * Оценка приклеивается через « · » только к «Оценено»: у двух других
+ * состояний её нет по определению.
+ */
+export function statusLabel(
+  kind: HomeworkStatusKind,
+  grade: string | null,
+  status: { notSubmitted: string; underReview: string; graded: string },
+): string {
+  if (kind === "graded") return grade ? `${status.graded} · ${grade}` : status.graded;
+  if (kind === "pending_review") return status.underReview;
+  return status.notSubmitted;
 }
 
 export function statusFamily(kind: HomeworkStatusKind, overdue: boolean): StatusKey {
