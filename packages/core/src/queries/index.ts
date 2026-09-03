@@ -3818,54 +3818,16 @@ export const getLessonStages = async (db: Db, lessonId: string): Promise<LessonS
   return (data ?? []) as LessonStage[];
 };
 
-/** Этап 3 BOLSHOE_OBNOVLENIE: PPTX-загрузка автодобавляет файл в "Материалы
- *  группы" (uploadPresentationFile → course_materials) — но AI-генерация
- *  (slides jsonb, не config.presentation_file) этот шаг никогда не делала.
- *  Дедуп по (group_id, title, type='presentation'), как у uploadPresentationFile.
- *  stage_id (миграция 119) — точная ссылка на исходный этап: этой карточки
- *  собственного файла никогда не будет (контент — lesson_stages.slides), без
- *  FK открыть её было нечем ("У этого материала нет файла" на любую попытку). */
-async function addAiPresentationToGroupMaterials(
-  db: Db,
-  lessonId: string,
-  stageId: string,
-  stageTitle: string,
-): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db2 = db as any;
-  const { data: lesson } = await db2
-    .from("lessons")
-    .select("group_id, subject:subjects(name)")
-    .eq("id", lessonId)
-    .maybeSingle();
-  if (!lesson?.group_id) return;
-
-  const { data: existing } = await db2
-    .from("course_materials")
-    .select("id")
-    .eq("group_id", lesson.group_id)
-    .eq("title", stageTitle)
-    .eq("type", "presentation")
-    .maybeSingle();
-  if (existing) return;
-
-  const { data: userRes } = await db.auth.getUser();
-  const userId = userRes?.user?.id;
-  if (!userId) return;
-  const { data: teacher } = await db2.from("teachers").select("id").eq("user_id", userId).maybeSingle();
-
-  await db2.from("course_materials").insert({
-    group_id: lesson.group_id,
-    lesson_id: lessonId,
-    stage_id: stageId,
-    title: stageTitle,
-    type: "presentation",
-    subject: lesson.subject?.name ?? null,
-    uploaded_by: teacher?.id ?? null,
-  });
-  // Best-effort: если insert упал (RLS/нет teacher-строки для этой сессии —
-  // напр. миграционный контекст), addLessonStage не должен падать из-за этого.
-}
+/* Здесь жила addAiPresentationToGroupMaterials — она заводила карточку в
+ * «Материалах группы» на каждый этап с AI-слайдами. Убрана 04.09.2026 вместе
+ * с вызовом: прикреплять материал должен учитель.
+ *
+ * ВТОРОЙ АВТОМАТИЧЕСКИЙ ПУТЬ ЖИВ И НЕ ТРОНУТ — он в базе, а не здесь:
+ * триггер на завершение урока (миграции 124, 174, 176) переносит материалы
+ * САМОГО УРОКА в «Материалы группы». Это другое: там учитель прикрепил файл
+ * руками, а машина лишь разложила его по полкам после звонка. Убирать его —
+ * отдельное решение и отдельная миграция.
+ */
 
 /** Типы этапов, у которых индексируемый текст лежит НЕ в lesson_stages, а в
  *  таблице quiz_questions. Для них разбор запускает replaceQuizQuestions —
@@ -3996,15 +3958,14 @@ export const addLessonStage = async (
     .single();
   if (error) throw error;
 
-  // AI-презентация (slides jsonb) — не ручная загрузка (config.presentation_file,
-  // уже добавляется через uploadPresentationFile отдельно) — см. addAiPresentationToGroupMaterials.
-  if (input.contentType === "presentation" && input.slides && input.slides.length > 0) {
-    try {
-      await addAiPresentationToGroupMaterials(db, lessonId, (data as LessonStage).id, input.title);
-    } catch {
-      // Best-effort — не должно ломать сохранение этапа.
-    }
-  }
+  // ═══ МАШИНА БОЛЬШЕ НЕ ПРИКРЕПЛЯЕТ МАТЕРИАЛ. 04.09.2026 ═══════════════════
+  //
+  // Здесь стоял вызов addAiPresentationToGroupMaterials: у каждого этапа с
+  // AI-слайдами заводилась карточка в «Материалах группы». Заказчик этого не
+  // хочет — материал прикрепляет учитель, а не машина.
+  //
+  // Ручные пути не тронуты: .pptx через uploadPresentationFile добавляет
+  // карточку как раньше, выбор из базы знаний и загрузка файла к уроку — тоже.
 
   // K.2, 05.08.2026 — приготовление фоновой AI-генерации картинки/mermaid
   // для нового этапа (Programming/Robotics — остальные предметы endpoint
