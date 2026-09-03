@@ -48,7 +48,7 @@ export default async function ManagerSchoolViewLayout({
       exitHref="/manager/schools"
       logoUrl={await signLogoUrl((data as { logo_path?: string | null } | null)?.logo_path)}
       cardTab
-      extra={<QuickStartButton schoolId={school.id} />}
+      extra={<QuickStartButton schoolId={school.id} canPrice />}
     >
       {children}
     </SchoolViewShell>

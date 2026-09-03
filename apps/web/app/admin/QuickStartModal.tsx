@@ -62,9 +62,18 @@ export function QuickStartModal({
    * Не передана — работает как раньше, у админа его собственная школа.
    */
   schoolId,
+  /**
+   * Можно ли задавать цену на шаге группы. Решение заказчика, 03.09.2026:
+   * цену задаёт менеджер. Счёт выставляется по цене группы, значит цена и
+   * есть сумма счёта.
+   *
+   * Умолчание — «нельзя»: дашборд админа открывает это окно без свойства.
+   */
+  canPrice = false,
 }: {
   onClose: () => void;
   schoolId?: string;
+  canPrice?: boolean;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).admin;
@@ -129,7 +138,10 @@ export function QuickStartModal({
     setError("");
     const fd = new FormData();
     fd.set("group_name", groupName.trim());
-    fd.set("course_price", price);
+    // Цены в форме нет вовсе, если её не задают: сервер поймёт отсутствие
+    // как «умолчание колонки», то есть ноль. Прислать её админ не может —
+    // получит отказ, а не тихое пренебрежение.
+    if (canPrice) fd.set("course_price", price);
     fd.set("catalog_ids", JSON.stringify([...picked]));
     fd.set("new_subject_names", JSON.stringify(новые));
     fd.set("teacher_id", teacherId);
@@ -189,15 +201,24 @@ export function QuickStartModal({
                 {имяЗанято && (
                   <p className="mt-1 text-xs font-semibold text-red-600">{d.quickStartNameTaken}</p>
                 )}
-                <input
-                  value={price}
-                  onChange={(e) => setPrice(formatCoursePriceInput(e.target.value))}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="0"
-                  className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
-                />
-                <p className="mt-1 text-xs text-gray-400">{d.quickStartPriceHint}</p>
+                {/* Шаг группы спрашивал цену. У админа он её больше не
+                    спрашивает — но молчать нельзя: он должен знать, что
+                    группа заведётся без цены и счёт по ней не выставится. */}
+                {canPrice ? (
+                  <>
+                    <input
+                      value={price}
+                      onChange={(e) => setPrice(formatCoursePriceInput(e.target.value))}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="0"
+                      className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">{d.quickStartPriceHint}</p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-xs text-amber-700">{d.quickStartPriceManager}</p>
+                )}
               </div>
 
               {/* ── ШАГ 2. ПРЕДМЕТЫ ───────────────────────────────────── */}
@@ -365,7 +386,10 @@ export function QuickStartModal({
 
 /** Кнопка входа. Живёт в «Быстрых действиях» дашборда — точке входа, которая
  *  до сих пор пустовала. */
-export function QuickStartButton({ schoolId }: { schoolId?: string } = {}) {
+export function QuickStartButton({
+  schoolId,
+  canPrice,
+}: { schoolId?: string; canPrice?: boolean } = {}) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).admin;
   const [open, setOpen] = useState(false);
@@ -377,7 +401,9 @@ export function QuickStartButton({ schoolId }: { schoolId?: string } = {}) {
       >
         <Sparkles className="h-4 w-4" /> {d.quickStart}
       </button>
-      {open && <QuickStartModal onClose={() => setOpen(false)} schoolId={schoolId} />}
+      {open && (
+        <QuickStartModal onClose={() => setOpen(false)} schoolId={schoolId} canPrice={canPrice} />
+      )}
     </>
   );
 }

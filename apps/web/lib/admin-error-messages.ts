@@ -215,6 +215,9 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   // Деньги меняет только менеджер. Отказ приходит сюда, ТОЛЬКО если действие
   // вызвали в обход экрана: на экране админа денежных кнопок нет вовсе.
   if (raw === "MONEY_MANAGER_ONLY") return t.moneyManagerOnly;
+  // Цену обучения задаёт менеджер: счёт выставляется по ней. Поля цены у
+  // админа нет вовсе, значит сюда отказ доходит только в обход экрана.
+  if (raw === "PRICE_MANAGER_ONLY") return t.priceManagerOnly;
 
   // Заход 5 по платежам — правка и отмена счетов.
   if (raw === "INVOICE_NOT_OPEN") return t.invoiceNotOpen;

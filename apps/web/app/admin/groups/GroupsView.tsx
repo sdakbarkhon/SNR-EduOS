@@ -131,6 +131,7 @@ function GroupForm({
   onClose,
   onSubmit,
   submitLabel,
+  canPrice,
 }: {
   defaultValues?: Partial<Group>;
   catalog: CatalogItem[];
@@ -139,6 +140,7 @@ function GroupForm({
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
   submitLabel: string;
+  canPrice: boolean;
 }) {
   // ЧТО ИМЕННО ЛЕЖИТ В groups.subject. Server action пишет туда
   // `getSubjectKeyByLabel(имя) ?? имя` — то есть слаг, если предмет есть в
@@ -201,13 +203,32 @@ function GroupForm({
           удалила единственного куратора, 243 снимает правила и триггеры.
           Форма перестаёт присылать teacher_id — server action уже умеет
           обходиться без него и пишет null (см. admin/actions.ts). */}
-      {/* Заход 2 по платежам. Цену задаёт ТОЛЬКО админ школы: у учителя
-          этой формы нет вовсе, а правило доступа на groups даёт запись
-          одному fn_is_admin() своей школы. */}
-      <Field label={t.fieldCoursePrice}>
-        <CoursePriceInput defaultValue={defaultValues?.course_price ?? 0} />
-        <p className="text-xs text-gray-400">{t.coursePriceHint}</p>
-      </Field>
+      {/* ЦЕНУ ЗАДАЁТ МЕНЕДЖЕР (03.09.2026). Прежняя запись здесь гласила
+          «цену задаёт ТОЛЬКО админ школы» — решение проекта отменено
+          заказчиком, и запись исправлена, чтобы следующий не поверил ей.
+
+          Счёт выставляется по цене группы, значит цена и есть сумма счёта.
+          Отобрать у админа счета и оставить цену — отобрать замок, оставив
+          ключ.
+
+          У АДМИНА ПОЛЯ НЕТ, НО ЕСТЬ ЧИСЛО. Мёртвого поля не оставили, как не
+          оставили мёртвых кнопок: поле, которое не сохранится, хуже
+          отсутствующего. А знать цену школа обязана. */}
+      {canPrice ? (
+        <Field label={t.fieldCoursePrice}>
+          <CoursePriceInput defaultValue={defaultValues?.course_price ?? 0} />
+          <p className="text-xs text-gray-400">{t.coursePriceHint}</p>
+        </Field>
+      ) : (
+        <Field label={t.fieldCoursePrice}>
+          <p className="rounded-xl bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+            {(defaultValues?.course_price ?? 0) > 0
+              ? `${formatCoursePrice(defaultValues!.course_price!)} ${t.sumUnit}`
+              : t.coursePriceNotSet}
+          </p>
+          <p className="text-xs text-gray-400">{t.coursePriceManagerNote}</p>
+        </Field>
+      )}
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
         <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60">
@@ -232,11 +253,28 @@ export function GroupsView({
    * менеджер: своей школы у него нет, и подставить её некому.
    */
   schoolId,
+  /**
+   * Можно ли отсюда ЗАДАВАТЬ ЦЕНУ обучения. Решение заказчика, 03.09.2026:
+   * цену задаёт менеджер.
+   *
+   * Причина — не в подчинении, а в устройстве: счёт выставляется ПО ЦЕНЕ
+   * ГРУППЫ (fn_issue_monthly_invoices берёт g.course_price). Оставить цену
+   * админу, отобрав у него счета, значило бы отобрать замок, но оставить
+   * ключ.
+   *
+   * ЦЕНУ АДМИН ВИДИТ ВСЕГДА — в столбце таблицы и строкой в форме правки.
+   * Не управляет, но знает: иначе он не ответит родителю, за что счёт.
+   *
+   * Умолчание — «нельзя», как у canEdit на оплатах: кто права не назвал, тот
+   * их не получил.
+   */
+  canPrice = false,
 }: {
   groups: Group[];
   catalog: CatalogItem[];
   defaultOpenAdd?: boolean;
   schoolId?: string;
+  canPrice?: boolean;
 }) {
   /** Дописать школу в форму. Без неё форма остаётся прежней. */
   const сШколой = (fd: FormData) => {
@@ -333,7 +371,11 @@ export function GroupsView({
     const fd = new FormData();
     fd.set("names", JSON.stringify(bulkCheck.fresh));
     fd.set("subject_catalog_id", bulkSubject);
-    fd.set("course_price", bulkPrice);
+    // Поля цены у админа нет — и в форму она не кладётся вовсе. Отсутствие
+    // поля readCoursePrice понимает как «не трогать», а на создании это
+    // означает умолчание колонки: ноль. Прислать её админ не может — сервер
+    // ответит отказом, а не молча выбросит.
+    if (canPrice) fd.set("course_price", bulkPrice);
     startTransition(async () => {
       try {
         const итог = await unwrap(actionCreateGroupsBulk(сШколой(fd)));
@@ -559,23 +601,37 @@ export function GroupsView({
                 </select>
               </Field>
 
-              <Field label={t.fieldCoursePrice}>
-                <Input
-                  value={bulkPrice}
-                  onChange={(e) => setBulkPrice(formatCoursePriceInput(e.target.value))}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="0"
-                />
-                <p className="text-xs text-gray-400">{t.groupsBulkPriceHint}</p>
-                {/* Про ноль говорим прямо: fn_issue_monthly_invoices берёт
-                    только группы с course_price > 0, и ученик такой группы
-                    попадает в «помехи» с причиной no_price. Проверено на
-                    живой базе 03.09.2026. */}
-                {bulkPrice.replace(/\s/g, "") === "" && (
+              {/* Цена одна на всю пачку — и уезжает к менеджеру целиком.
+                  Админу вместо поля говорим, с чем заведутся группы: с нулём,
+                  и что дальше. Умолчать было бы хуже: пачка из десяти групп
+                  без цены — это десять счетов, которые не выставятся. */}
+              {canPrice ? (
+                <Field label={t.fieldCoursePrice}>
+                  <Input
+                    value={bulkPrice}
+                    onChange={(e) => setBulkPrice(formatCoursePriceInput(e.target.value))}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-400">{t.groupsBulkPriceHint}</p>
+                  {/* Про ноль говорим прямо: fn_issue_monthly_invoices берёт
+                      только группы с course_price > 0, и ученик такой группы
+                      попадает в «помехи» с причиной no_price. Проверено на
+                      живой базе 03.09.2026. */}
+                  {bulkPrice.replace(/\s/g, "") === "" && (
+                    <p className="text-xs text-amber-700">{t.groupsBulkZeroPrice}</p>
+                  )}
+                </Field>
+              ) : (
+                <Field label={t.fieldCoursePrice}>
+                  <p className="rounded-xl bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+                    {t.coursePriceNotSet}
+                  </p>
                   <p className="text-xs text-amber-700">{t.groupsBulkZeroPrice}</p>
-                )}
-              </Field>
+                  <p className="text-xs text-gray-400">{t.coursePriceManagerNote}</p>
+                </Field>
+              )}
 
               {/* ── ЧТО ПРОИЗОЙДЁТ ─────────────────────────────────────── */}
               {bulkList.length > 0 && (
@@ -690,6 +746,7 @@ export function GroupsView({
                 }
               })}
               submitLabel={t.createBtn}
+              canPrice={canPrice}
             />
           </ModalCard>
         </Backdrop>
@@ -717,6 +774,7 @@ export function GroupsView({
                 });
               }}
               submitLabel={t.saveBtn}
+              canPrice={canPrice}
             />
           </ModalCard>
         </Backdrop>

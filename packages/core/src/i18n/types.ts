@@ -756,6 +756,7 @@ export interface Dictionary {
     fieldSubject: string;
     fieldCoursePrice: string;
     coursePriceHint: string;
+    coursePriceManagerNote: string;
     tableCoursePrice: string;
     coursePriceNotSet: string;
     tableBalance: string;
@@ -897,6 +898,7 @@ export interface Dictionary {
     quickStartNameTaken: string;
     quickStartNameEmpty: string;
     quickStartPriceHint: string;
+    quickStartPriceManager: string;
     quickStartFromCatalog: string;
     quickStartCatalogEmpty: string;
     quickStartNewSubjects: string;
@@ -1426,6 +1428,7 @@ export interface Dictionary {
     topUpAmountInvalid: string;
     topUpReasonRequired: string;
     moneyManagerOnly: string;
+    priceManagerOnly: string;
     invoiceNotOpen: string;
     invoiceNotCanceled: string;
     invoiceNotFound: string;

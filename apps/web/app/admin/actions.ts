@@ -350,10 +350,28 @@ async function resolveGroupSubject(formData: FormData, schoolId: string): Promis
  * что пустое поле: пустое — осознанный ноль («цена не задана»), отсутствие —
  * форма, которая про цену не знает, и её молчание не должно обнулять уже
  * заданную цену.
+ *
+ * ═══ 03.09.2026 — ЦЕНУ ЗАДАЁТ ТОЛЬКО МЕНЕДЖЕР ═════════════════════════════
+ *
+ * Решение заказчика, продолжение переезда денег. Счёт выставляется ПО ЦЕНЕ
+ * ГРУППЫ — это видно прямо в `fn_issue_monthly_invoices`, которая берёт
+ * `g.course_price`. Значит тот, кто задаёт цену, задаёт и сумму счёта, и
+ * оставлять её админу, отобрав у него счета, значило бы отобрать замок, но
+ * оставить ключ.
+ *
+ * ОТКАЗ, А НЕ ТИХОЕ ПРЕНЕБРЕЖЕНИЕ. Молча выбросить присланную цену было бы
+ * мягче, но тогда подделанный запрос выглядел бы как удавшийся. Здесь то же
+ * правило, что и у школы в verifyStaff: чужое — отказ, а не подстановка.
+ *
+ * ПОЛЯ У АДМИНА НЕТ ВОВСЕ — ни в форме группы, ни в массовом создании, ни в
+ * едином окне. Значит сюда отказ доходит, ТОЛЬКО если действие вызвали в
+ * обход экрана. Мёртвых полей не осталось, как не осталось мёртвых кнопок.
  */
-function readCoursePrice(formData: FormData): number | undefined {
+function readCoursePrice(formData: FormData, role: StaffRole): number | undefined {
   const raw = formData.get("course_price");
-  return raw === null ? undefined : parseCoursePrice(String(raw));
+  if (raw === null) return undefined;
+  if (role !== "manager") throw new Error("PRICE_MANAGER_ONLY");
+  return parseCoursePrice(String(raw));
 }
 
 export async function actionCreateGroup(formData: FormData) {
@@ -362,13 +380,17 @@ export async function actionCreateGroup(formData: FormData) {
     // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
     // отвергнет. Подделать нечего.
     const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
-    const { schoolId } = await verifyAdmin(школаИзФормы);
+    const { schoolId, role } = await verifyAdmin(школаИзФормы);
     const name = String(formData.get("name") ?? "").trim();
     if (!name) throw new Error("Missing fields");
     const subject = await resolveGroupSubject(formData, schoolId);
     const id = await createGroup({
       name, subject, teacher_id: null, school_id: schoolId,
-      course_price: readCoursePrice(formData),
+      // Админ цену не шлёт — значит undefined, и колонка берёт своё
+      // умолчание: `course_price integer NOT NULL DEFAULT 0`. Ноль означает
+      // «цена не задана», и ученик такой группы виден менеджеру в помехах
+      // раздела оплат с причиной no_price. Тихой выдуманной цены не будет.
+      course_price: readCoursePrice(formData, role),
     });
     revalidatePath("/admin/groups");
     revalidatePath("/admin");
@@ -394,7 +416,7 @@ export async function actionCreateGroupsBulk(
     // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
     // отвергнет. Подделать нечего.
     const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
-    const { schoolId } = await verifyAdmin(школаИзФормы);
+    const { schoolId, role } = await verifyAdmin(школаИзФормы);
 
     let разобрано: unknown;
     try {
@@ -410,8 +432,9 @@ export async function actionCreateGroupsBulk(
     const итог = await createGroupsBulk({
       names,
       subject,
-      // undefined тут невозможно: поле в форме есть всегда, пустое = 0.
-      coursePrice: readCoursePrice(formData) ?? 0,
+      // У менеджера поле есть всегда, пустое = 0. У админа поля нет вовсе —
+      // undefined, и вся пачка заводится с нулём, то есть «цена не задана».
+      coursePrice: readCoursePrice(formData, role) ?? 0,
       schoolId,
     });
 
@@ -466,7 +489,7 @@ export async function actionQuickStart(
     // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
     // отвергнет. Подделать нечего.
     const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
-    const { schoolId } = await verifyAdmin(школаИзФормы);
+    const { schoolId, role } = await verifyAdmin(школаИзФормы);
 
     const groupName = String(formData.get("group_name") ?? "").trim();
     if (!groupName) throw new Error("Missing fields");
@@ -486,7 +509,8 @@ export async function actionQuickStart(
     const итог = await quickStartGroup({
       groupName,
       // Пустое поле цены = 0, тем же разбором, что у обеих форм группы.
-      coursePrice: readCoursePrice(formData) ?? 0,
+      // У админа шага с ценой нет — ноль, и его видно в помехах оплат.
+      coursePrice: readCoursePrice(formData, role) ?? 0,
       catalogIds: список("catalog_ids"),
       newSubjectNames: список("new_subject_names"),
       teacherId: teacher || null,
@@ -508,13 +532,16 @@ export async function actionUpdateGroup(formData: FormData) {
     // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
     // отвергнет. Подделать нечего.
     const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
-    const { schoolId, isSuperAdmin } = await verifyAdmin(школаИзФормы);
+    const { schoolId, isSuperAdmin, role } = await verifyAdmin(школаИзФормы);
     const group_id = String(formData.get("group_id") ?? "");
     const name = String(formData.get("name") ?? "").trim();
     const subject = await resolveGroupSubject(formData, schoolId);
     await updateGroup(
       group_id,
-      { name, subject, course_price: readCoursePrice(formData) },
+      // Админ правит имя и предмет, цену не шлёт — undefined, и updateGroup
+      // её НЕ ТРОГАЕТ (см. lib/admin-api.ts). Заданная менеджером цена
+      // переживает любую правку группы админом.
+      { name, subject, course_price: readCoursePrice(formData, role) },
       schoolId,
       isSuperAdmin,
     );

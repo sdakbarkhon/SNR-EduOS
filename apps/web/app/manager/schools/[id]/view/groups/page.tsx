@@ -16,6 +16,9 @@ export default async function ManagerGroupsPage({ params }: { params: Promise<{ 
       groups={groups as React.ComponentProps<typeof GroupsView>["groups"]}
       catalog={catalog as React.ComponentProps<typeof GroupsView>["catalog"]}
       schoolId={actor.role === "manager" ? school.id : undefined}
+      // Цену задаёт менеджер: счёт выставляется по ней. Суперадмин заходит
+      // сюда читать — школы ему не дают, значит и цену он не задаёт.
+      canPrice={actor.role === "manager"}
     />
   );
 }
