@@ -158,13 +158,21 @@ function Wheel({
 }
 
 export function IosTimePicker({
-  value, onChange, minDate, rows = VISIBLE_DEFAULT,
+  value, onChange, minDate, rows = VISIBLE_DEFAULT, className = "",
 }: {
   value: string;
   onChange: (v: string) => void;
   minDate?: string;
   /** Сколько строк видно. Нечётное: середина — выбранное значение. */
   rows?: number;
+  /**
+   * Классы на внешнюю рамку — и только на неё. 04.09.2026: окно урока ставит
+   * колесо в колонку рядом с полями, и рамка должна доходить до низа ряда, а
+   * не обрываться выше. Само колесо от этого не растягивается: строк
+   * по-прежнему столько, сколько сказано в `rows`, а лишняя высота уходит в
+   * поля вокруг. Ни одна строка счёта времени здесь не участвует.
+   */
+  className?: string;
 }) {
   const now = useMemo(() => nowInTashkent(), []);
   const isToday = !!minDate && minDate === now.dateStr;
@@ -228,7 +236,7 @@ export function IosTimePicker({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+    <div className={`rounded-2xl border border-slate-200 bg-white p-3 ${className}`}>
       <style>{`.ios-wheel-scroll{scrollbar-width:none;-ms-overflow-style:none}.ios-wheel-scroll::-webkit-scrollbar{display:none}`}</style>
       <div className="flex items-stretch gap-2">
         <Wheel items={hourItems} value={selHour} onChange={onHour} ariaLabel="Часы" rows={rows} />

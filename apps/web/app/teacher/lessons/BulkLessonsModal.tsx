@@ -309,8 +309,8 @@ export function BulkLessonsFields({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="space-y-5">
         {doneCount !== null ? (
           <div className="py-8 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100">
@@ -337,7 +337,7 @@ export function BulkLessonsFields({
                 Поля «по какое число» нет: конец периода считается от числа
                 тем, см. конецПериода(). */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <div className="space-y-4 lg:col-span-2">
+              <div className="space-y-5 lg:col-span-2">
                 <Field label={t.bulkFrom}>
                   <DatePickerField value={from} onChange={(v) => { setFrom(v); setPreview(null); }} minToday />
                 </Field>
@@ -361,15 +361,19 @@ export function BulkLessonsFields({
                   </div>
                 </Field>
               </div>
-              <Field label={t.bulkTime}>
-                {/* Общее время — оно же умолчание для режима «по дням». */}
+              <div className="flex h-full flex-col">
+                <label className={FIELD_LABEL}>{t.bulkTime}</label>
+                {/* Общее время — оно же умолчание для режима «по дням».
+                    Рамка тянется до низа ряда тем же способом, что у
+                    одиночного урока: растёт пустое место, а не колесо. */}
                 <IosTimePicker
                   value={time}
                   onChange={(v) => { setTime(v); setPreview(null); }}
                   minDate={from}
                   rows={3}
+                  className="flex flex-1 flex-col justify-center"
                 />
-              </Field>
+              </div>
             </div>
 
             {/* ── Своё время по дням (пункт 11) ──────────────────────── */}

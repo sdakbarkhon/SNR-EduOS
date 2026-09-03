@@ -431,8 +431,8 @@ function LessonFormModal({
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-        <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl overflow-y-auto max-h-[90vh]">
-          <div className="flex items-center justify-between p-6 pb-4">
+        <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl overflow-y-auto max-h-[92vh]">
+          <div className="flex items-center justify-between p-7 pb-5">
             <h2 className="text-lg font-bold text-[#1D1D1F]">
               {mode === "create" ? "Новый урок" : "Редактировать урок"}
             </h2>
@@ -440,7 +440,7 @@ function LessonFormModal({
               <X className="h-5 w-5" />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
+          <form onSubmit={handleSubmit} className="px-7 pb-7 space-y-5">
             {/* ── ОДИН УРОК ИЛИ НЕСКОЛЬКО ─────────────────────────────────
                 Показывается только при создании: править пачкой нечего.
                 Общие поля ниже — одни и те же у обоих режимов, поэтому
@@ -563,7 +563,7 @@ function LessonFormModal({
                 слева дата и дни недели. Два режима должны читаться как одно
                 окно, а не как два разных. */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <div className="space-y-4 lg:col-span-2">
+              <div className="space-y-5 lg:col-span-2">
                 <div>
                   <label className={labelCls}>Дата *</label>
                   <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
@@ -579,14 +579,25 @@ function LessonFormModal({
                   <textarea rows={2} value={form.desc} onChange={e => set("desc", e.target.value)} placeholder="Что ученики должны узнать" className={`${inputCls} resize-none`} />
                 </div>
               </div>
-              <div>
+              <div className="flex h-full flex-col">
                 <label className={`${labelCls} flex items-center gap-1.5`}>
                   <Clock className="h-3.5 w-3.5" /> Время начала *
                 </label>
                 {/* Три строки вместо пяти: колесо занимало двести пикселей —
                     больше, чем все остальные поля вместе. Механизм не тронут,
-                    высота задаётся необязательным свойством. */}
-                <IosTimePicker value={form.startTime} onChange={v => set("startTime", v)} minDate={form.date} rows={3} />
+                    высота задаётся необязательным свойством.
+
+                    РАМКА ДО НИЗА РЯДА (04.09.2026). Слева три поля, справа
+                    колесо — и справа под ним оставалась дыра в полсотни
+                    пикселей. Растягивается ПУСТОЕ МЕСТО рамки, а не колесо:
+                    строк по-прежнему три, они просто стоят по центру. */}
+                <IosTimePicker
+                  value={form.startTime}
+                  onChange={v => set("startTime", v)}
+                  minDate={form.date}
+                  rows={3}
+                  className="flex flex-1 flex-col justify-center"
+                />
               </div>
             </div>
             {/* ДЛИТЕЛЬНОСТИ ЗДЕСЬ БОЛЬШЕ НЕТ (01.09.2026, миграция 246).
