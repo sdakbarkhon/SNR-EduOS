@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Star, Check, Loader2 } from "lucide-react";
-import { getDictionary, gradeStudentForLesson, isMarkLockedError, markLockState } from "@snr/core";
-import type { Locale, LessonGrade, LessonLockStatus } from "@snr/core";
+import { getDictionary, getLessonStageGrades, gradeStudentForLesson, isMarkLockedError, markLockState } from "@snr/core";
+import type { Locale, LessonGrade, LessonLockStatus, LessonStageGrade } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -62,6 +62,43 @@ export function GradeModal({ lessonId, teacherId, target, lessonStatus, onClose,
   const [saveError, setSaveError] = useState<null | "locked" | "failed">(null);
   /** Частичный отказ при «оценить остальных»: сколько прошло из скольких. */
   const [partial, setPartial] = useState<{ ok: number; all: number } | null>(null);
+
+  /**
+   * ОЦЕНКИ ЗА ЭТАПЫ ЭТОГО УРОКА — ЕДИНСТВЕННОЕ МЕСТО, ГДЕ ОНИ ОСТАЛИСЬ У
+   * УЧИТЕЛЯ. 03.09.2026.
+   *
+   * Со всех экранов «Оценки» они убраны: третья сущность путала. Но здесь она
+   * не третья, а ПОДСПОРЬЕ: учитель ставит оценку за урок и видит рядом, как
+   * ученик работал на этапах.
+   *
+   * Только при оценке ОДНОГО: у «оценить остальных» учеников много, и десять
+   * столбиков этапов превратили бы окно в таблицу.
+   */
+  const [stageGrades, setStageGrades] = useState<LessonStageGrade[] | null>(null);
+
+  useEffect(() => {
+    if (!один) return;
+    let жив = true;
+    getLessonStageGrades(db, lessonId, один.studentId)
+      .then((r) => { if (жив) setStageGrades(r); })
+      // Подсказка — не право: не загрузилась, значит её просто нет, а окно
+      // работает. Ронять выставление оценки из-за неё было бы нелепо.
+      .catch(() => { if (жив) setStageGrades([]); });
+    return () => { жив = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId, один?.studentId]);
+
+  /**
+   * СРЕДНЕЕ ИЗ ЭТАПОВ — ЭТО НЕ СРЕДНИЙ БАЛЛ ПРОДУКТА.
+   *
+   * Считается здесь и только для показа. Общее правило (utils/gradeAverage)
+   * этапы в средний балл не пускает — и не должно; звать его отсюда нельзя,
+   * иначе через месяц кто-нибудь решит, что этапы всё-таки считаются. Имя у
+   * подсказки поэтому своё: «среднее из этапов», а не «средний балл».
+   */
+  const среднееИзЭтапов = stageGrades && stageGrades.length > 0
+    ? Math.round((stageGrades.reduce((n, g) => n + g.grade, 0) / stageGrades.length) * 10) / 10
+    : null;
 
   // Замок миграций 203 и 245. Правило целиком живёт в markLockState — здесь
   // только вопрос и ответ, своей копии отсчёта у экрана нет. Комментарий не
@@ -170,6 +207,45 @@ export function GradeModal({ lessonId, teacherId, target, lessonStatus, onClose,
               {dl.markWindowLeft.replace("{n}", String(lock.minutesLeft))}
             </p>
           ) : null}
+
+          {/* ── КАК УЧЕНИК РАБОТАЛ НА ЭТАПАХ ────────────────────────────
+              Единственное место у учителя, где оценки за этапы остались.
+              Показ, а не оценка: «среднее из этапов» можно подставить одним
+              нажатием, но поставить учитель волен что угодно. */}
+          {stageGrades && stageGrades.length > 0 && (
+            <div className="rounded-xl border border-violet-100 bg-violet-50/50 px-3 py-2.5">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-violet-700">
+                {dl.stageGradesTitle}
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {stageGrades.map((g) => (
+                  <li key={g.stageId} className="flex items-baseline justify-between gap-2 text-[11.5px]">
+                    <span className="min-w-0 flex-1 truncate text-slate-600">{g.title}</span>
+                    {g.detail && (
+                      <span className="shrink-0 text-slate-400">
+                        {dl.stageGradesOf
+                          .replace("{correct}", String(g.detail.correct))
+                          .replace("{total}", String(g.detail.total))}
+                      </span>
+                    )}
+                    <span className="shrink-0 font-bold text-violet-700">{g.grade}</span>
+                  </li>
+                ))}
+              </ul>
+              {среднееИзЭтапов != null && (
+                <button
+                  type="button"
+                  onClick={() => selectGrade(Math.round(среднееИзЭтапов))}
+                  disabled={lock.locked}
+                  className="mt-2 w-full rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-[11.5px] font-semibold text-violet-700 transition-colors hover:bg-violet-50 disabled:opacity-40"
+                >
+                  {dl.stageGradesSuggest
+                    .replace("{avg}", String(среднееИзЭтапов))
+                    .replace("{grade}", String(Math.round(среднееИзЭтапов)))}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Частичный отказ при «оценить остальных»: часть прошла, часть нет.
               Молчать нельзя — иначе человек решит, что оценены все. */}

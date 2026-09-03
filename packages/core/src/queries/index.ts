@@ -1325,6 +1325,72 @@ export type StudentGradeItem = {
   detail?: { correct: number; total: number } | null;
 };
 
+/** Одна оценка за этап урока — для подсказки учителю в окне выставления
+ *  оценки за урок. Ровно то, что нужно показать рядом с учеником. */
+export type LessonStageGrade = {
+  stageId: string;
+  title: string;
+  contentType: string | null;
+  grade: number;
+  /** «7 из 10» у квиза, Kahoot и кода с пропусками; у прочих null. */
+  detail: { correct: number; total: number } | null;
+};
+
+/**
+ * ОЦЕНКИ ЗА ЭТАПЫ ОДНОГО УРОКА У ОДНОГО УЧЕНИКА. 03.09.2026.
+ *
+ * Единственное место, куда оценки за этапы вернулись после того, как их убрали
+ * со всех экранов «Оценки»: окно, где учитель ставит оценку ЗА УРОК. Он видит,
+ * как ученик работал на этапах, и решает сам.
+ *
+ * ЭТО НЕ СРЕДНИЙ БАЛЛ ПРОДУКТА. Подсказку «среднее из этапов» считает вызывающий
+ * и только для показа; общее правило (utils/gradeAverage) этапы в средний балл
+ * не пускало и не пускает, и звать его здесь нельзя — иначе через месяц кто-то
+ * решит, что этапы всё-таки считаются.
+ *
+ * Подсказка про FK такая же, как в getStudentGrades: у lesson_stages две связи
+ * с lessons, и без явного `!lesson_id` PostgREST не выбирает, какую взять.
+ */
+export const getLessonStageGrades = async (
+  db: Db,
+  lessonId: string,
+  studentId: string,
+): Promise<LessonStageGrade[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lesson_stage_progress")
+    .select("grade, submission_data, stage:lesson_stages!inner(id, title, content_type, position, lesson_id)")
+    .eq("student_id", studentId)
+    .eq("stage.lesson_id", lessonId)
+    .not("grade", "is", null);
+  if (error) throw error;
+
+  return ((data ?? []) as Array<{
+    grade: number;
+    submission_data: { correct?: unknown; score?: unknown; total?: unknown } | null;
+    stage: { id: string; title: string; content_type: string | null; position: number } | null;
+  }>)
+    .filter((r) => !!r.stage)
+    .sort((a, b) => (a.stage!.position ?? 0) - (b.stage!.position ?? 0))
+    .map((r) => {
+      // Формы ответа три и все со счётом: квиз {correct,total}, Kahoot
+      // {correct,total}, код с пропусками {score,total}. Берём обе, иначе
+      // третья молча осталась бы без подписи — тот же разбор, что в
+      // getStudentGrades.
+      const сд = r.submission_data;
+      const верно = typeof сд?.correct === "number" ? сд.correct
+        : typeof сд?.score === "number" ? сд.score : null;
+      const всего = typeof сд?.total === "number" ? сд.total : null;
+      return {
+        stageId: r.stage!.id,
+        title: r.stage!.title,
+        contentType: r.stage!.content_type,
+        grade: r.grade,
+        detail: верно != null && всего != null && всего > 0 ? { correct: верно, total: всего } : null,
+      };
+    });
+};
+
 /**
  * Категория оценки для фильтра на экране оценок.
  *
@@ -1332,11 +1398,10 @@ export type StudentGradeItem = {
  * homework (задание на дом), и от lesson_stage_progress (этап «код» прямо
  * на уроке), так что сам по себе kind это различить не может.
  *
- * 30.08.2026 — КАТЕГОРИЙ СТАЛО ТРИ, А НЕ ДВЕ. «Работа на уроке» отделена
- * от «За урок»: раньше оценка за квиз и оценка учителя за урок падали в
- * одну кучу, хотя это разные вещи. Оценка за урок идёт в средний балл, за
- * этап — нет (utils/gradeAverage), и человек, глядя на список, различить их
- * не мог. Это и была та путаница, ради которой их вынесли из среднего.
+ * 03.09.2026 — ВЕТКА "stage" СТАЛА НЕДОСТИЖИМОЙ С ЭКРАНОВ, но осталась здесь.
+ * Оценки за этапы урока с экранов «Оценки» убраны совсем: getStudentGrades их
+ * больше не отдаёт (см. includeStageGrades). Классификатор при этом врать не
+ * начал — если этап всё-таки придёт, он будет назван этапом, а не «за урок».
  *
  * Зовёт эту функцию ОДИН экран — оценки ученика. У учителя своя матрица,
  * она этапов не показывает вовсе.
@@ -1369,13 +1434,35 @@ type HwJoin = { title: string; content_type: string; group: { name: string } | n
  *  который смотрит школу служебным ключом. Личности в базе у него нет,
  *  current_school_id() пуст, а `OR is_super_admin()` в правилах ни к какой
  *  школе не привязан — без явного фильтра он собрал бы обе школы разом.
- *  Всем остальным сужают правила доступа, и довод им не нужен. */
+ *  Всем остальным сужают правила доступа, и довод им не нужен.
+ *
+ *  ═══ 03.09.2026 — ОЦЕНКИ ЗА ЭТАПЫ УРОКА БОЛЬШЕ НЕ ОТДАЮТСЯ ══════════════
+ *
+ *  Решение заказчика: в продукте было ТРИ вида оценок — за урок, за задание и
+ *  за этап урока (квиз, Kahoot, код внутри урока). Третий путал: заказчик сам
+ *  в них запутался и решил, что запутается и родитель.
+ *
+ *  РЕЖЕМ ЗДЕСЬ, В ИСТОЧНИКЕ, А НЕ НА ЭКРАНАХ. Эта функция кормит ВСЕ экраны
+ *  оценок: ученика, родителя, родительское мобильное и аналитику. Фильтр,
+ *  вписанный на каждом экране, стал бы четырьмя копиями одного правила — а в
+ *  этом проекте копии расходились семь раз. Заодно сами собой очищаются
+ *  кольцо распределения и столбики динамики: они считают по тому же списку.
+ *
+ *  УМОЛЧАНИЕ — НЕ ОТДАВАТЬ. Кто права не назвал, тот их не получил: новый
+ *  экран, забывший про довод, окажется чистым, а не с лишней сущностью.
+ *
+ *  ОЦЕНКИ ИЗ БАЗЫ НЕ УДАЛЯЮТСЯ — они остаются в lesson_stage_progress и
+ *  по-прежнему видны в двух местах: у учителя в окне выставления оценки за
+ *  урок (как подсказка) и у ученика внутри самого урока, где он их и получал.
+ *  Средний балл они не считали НИКОГДА (utils/gradeAverage), и это правило
+ *  не тронуто. */
 export const getStudentGrades = async (
   db: Db,
   studentId?: string,
-  opts?: { schoolId?: string },
+  opts?: { schoolId?: string; includeStageGrades?: boolean },
 ): Promise<StudentGradeItem[]> => {
   const schoolId = opts?.schoolId;
+  const includeStageGrades = opts?.includeStageGrades === true;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const вШколе = (q: any): any => (schoolId ? q.eq("school_id", schoolId) : q);
   // NB: не выбираем graded_at — экран ученика не должен зависеть от миграции 19
@@ -1487,7 +1574,11 @@ export const getStudentGrades = async (
   }
 
   // Lesson stage task grades (quiz_qia, quiz_kahoot, code, external — migration 39)
-  {
+  //
+  // 03.09.2026 — ТОЛЬКО ПО ЯВНОЙ ПРОСЬБЕ. Экраны оценок их больше не
+  // показывают; довода не передал — блок не выполняется вовсе, и лишнего
+  // похода в базу тоже нет.
+  if (includeStageGrades) {
     // lesson:lessons!lesson_id — explicit FK hint. lesson_stages<->lessons has
     // TWO relationships (lesson_stages.lesson_id -> lessons.id, AND the
     // reverse lessons.active_stage_id -> lesson_stages.id from migration 54),

@@ -60,7 +60,12 @@ export async function collectAnalyticsFacts(
     // список, а экран показывал нули как настоящие данные: «средний балл 0,
     // оценок 0» неотличимо от школы, где оценок правда нет. Пусть падает —
     // страница покажет ошибку, и это честнее молчаливого нуля.
-    getStudentGrades(db, undefined, schoolId ? { schoolId } : undefined),
+    // includeStageGrades: true — ЯВНО, чтобы данные помощника остались
+    // байт в байт прежними. Экраны оценок с 03.09.2026 этапы не показывают,
+    // но помощник в запретной зоне: менять то, что он видит, этот заход не
+    // собирался. Правило среднего балла применяется ниже по sourceTable, как
+    // и раньше, — этапы в среднее не шли и не идут.
+    getStudentGrades(db, undefined, { ...(schoolId ? { schoolId } : {}), includeStageGrades: true }),
     школа(db.from("students").select("id, full_name, student_groups(groups(id, name))")),
     школа(db.from("attendance").select("student_id, status, lesson:lessons!inner(starts_at, group:groups!inner(name), subject:subjects(name))")),
     школа(db.from("homework").select("id, due_date, group_id, group:groups!inner(name), subject:subjects(name)")),

@@ -2437,6 +2437,9 @@ export interface Dictionary {
     markLockedBody: string;
     markWindowLeft: string;    // «Исправить можно ещё {n} мин»
     markCommentAlways: string;
+    stageGradesTitle: string;
+    stageGradesOf: string;
+    stageGradesSuggest: string;
     markFreeWhileLesson: string; // урок идёт — замка нет (миграция 245)
     createNoSubjects: string;
     editSubjectHasGrades: string;   // «уже стоит оценок: {n}» — предупреждение при смене предмета
@@ -3469,7 +3472,6 @@ export interface Dictionary {
     filterAll: string;          // "Все"
     filterAssignment: string;   // "За задания"
     filterLesson: string;       // "За урок"
-    filterStage: string;        // "Работа на уроке" — оценки за этапы урока
     periodWeek: string;         // "Эта неделя"
     periodMonth: string;        // "Этот месяц"
     periodSemester: string;     // "Этот семестр"

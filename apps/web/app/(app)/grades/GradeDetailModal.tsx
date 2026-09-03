@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText, Download, ExternalLink } from "lucide-react";
-import { getSubjectConfig, getGradeSubmissionDetail, subjectLabelOf } from "@snr/core";
+import { getSubjectConfig, getGradeSubmissionDetail, gradeCategory, subjectLabelOf } from "@snr/core";
 import type { Dictionary, StudentGradeItem, GradeSubmissionDetail } from "@snr/core";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { createClient } from "@/lib/supabase/client";
@@ -33,9 +33,18 @@ export function GradeDetailModal({
   onClose: () => void;
 }) {
   const subjectLabel = subjectLabelOf(grade.subject);
-  const category = grade.sourceTable === "homework_submissions" || grade.sourceTable === "test_submissions" || grade.sourceTable === "project_submissions"
-    ? "assignment" as const
-    : "lesson" as const;
+  // ВТОРОЙ КОПИИ ПРАВИЛА ЗДЕСЬ БОЛЬШЕ НЕТ. 03.09.2026.
+  //
+  // Стояла своя классификация по источнику, слово в слово повторявшая
+  // gradeCategory из packages/core, но БЕЗ ветки этапов — и оценка за квиз
+  // молча получала бейдж «За урок», то есть выдавала себя за оценку учителя.
+  // Ровно та беда, на которой в этом проекте правила расходились семь раз.
+  //
+  // Теперь спрашиваем общую функцию. Для четырёх оставшихся источников ответ
+  // тот же, что и был; этапы сюда больше не доходят вовсе (getStudentGrades
+  // их не отдаёт), но если однажды дойдут — назовутся своим именем, а не
+  // чужим.
+  const category = gradeCategory(grade.sourceTable) === "assignment" ? "assignment" as const : "lesson" as const;
 
   const [detail, setDetail] = useState<GradeSubmissionDetail | null>(null);
   const [loading, setLoading] = useState(true);

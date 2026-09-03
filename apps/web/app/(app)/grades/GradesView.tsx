@@ -22,10 +22,12 @@ interface Props {
 
 type TypeFilter = "all" | StudentGradeItem["kind"];
 type PeriodFilter = "all" | "week" | "month" | "semester";
-// 30.08.2026 — третья категория. «Работа на уроке» отделена от «За урок»:
-// оценка за квиз и оценка учителя за урок — разные вещи, первая в средний
-// балл не идёт, а в списке они стояли неразличимо.
-type CategoryFilter = "all" | "assignment" | "lesson" | "stage";
+// 03.09.2026 — КАТЕГОРИИ СНОВА ДВЕ. Третья, «Работа на уроке», была заведена
+// 30.08 коммитом 49c2d643, и ЭТО РЕШЕНИЕ ОТМЕНЕНО ЗАКАЗЧИКОМ: он сам запутался
+// в двух видах оценок и решил, что запутается и родитель. Оценки за этапы
+// урока с экранов «Оценки» убраны совсем — не спрятаны за фильтр, а не
+// приходят вовсе (см. getStudentGrades). Значит и вкладке нечего показывать.
+type CategoryFilter = "all" | "assignment" | "lesson";
 type SortValue = "date_desc" | "date_asc" | "grade_desc" | "grade_asc" | "subject";
 type Tier = 5 | 4 | 3 | 2 | 1;
 
@@ -309,20 +311,18 @@ export function GradesView({ grades, error = false }: Props) {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Table card */}
         <div className="min-w-0 flex-1 rounded-[24px] border border-white bg-white/80 p-6 shadow-md backdrop-blur-xl">
-          {/* Все / За задания / За урок / Работа на уроке — сегментированный
-              переключатель, стиль как у "Сегодня/Неделя" в расписании
-              (rounded-full bg-white p-1 shadow-sm контейнер + пилюли внутри).
+          {/* Все / За задания / За урок — сегментированный переключатель,
+              стиль как у «Сегодня/Неделя» в расписании.
 
-              Четвёртая пилюля добавлена 30.08.2026. До неё оценки за этапы
-              урока попадали в «За урок» вместе с оценками учителя за урок —
-              и человек не мог отличить машинный балл за квиз от настоящей
-              оценки. Теперь «За урок» показывает только lesson_grades. */}
+              ЧЕТВЁРТОЙ ПИЛЮЛИ «Работа на уроке» здесь больше нет: заведена
+              30.08.2026, отменена заказчиком 03.09.2026 вместе со всеми
+              показами оценок за этапы урока. «За урок» — это lesson_grades,
+              то есть оценка, которую учитель поставил рядом с перекличкой. */}
           <div className="mb-4 flex w-fit flex-wrap rounded-full bg-white p-1 shadow-sm">
             {([
               { value: "all", label: t.filterAll },
               { value: "assignment", label: t.filterAssignment },
               { value: "lesson", label: t.filterLesson },
-              { value: "stage", label: t.filterStage },
             ] as { value: CategoryFilter; label: string }[]).map((opt) => (
               <button
                 key={opt.value}
