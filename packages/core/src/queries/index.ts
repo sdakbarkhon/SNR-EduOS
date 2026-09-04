@@ -6,7 +6,7 @@
 import type { Db } from "../supabase/factory";
 import type { AiReviewStatus, Group, AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
-import { unwrap } from "./helpers";
+import { unwrap, BOOK_SELECT } from "./helpers";
 // Прямой импорт, а не через собственный `export * from "./parent"`: parent.ts
 // ничего из index.ts не берёт, поэтому кольца не возникает.
 import { getChildCountedGrades } from "./parent";
@@ -5201,7 +5201,7 @@ export const markStudentAttendance = async (
 export const getAllBooks = async (db: Db): Promise<Book[]> => {
   const { data, error } = await db
     .from("books")
-    .select("*")
+    .select(BOOK_SELECT)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as Book[];
@@ -5638,7 +5638,7 @@ export const deleteHomework = async (db: Db, homeworkId: string) => {
 export const getTeacherBooks = async (db: Db, teacherId: string): Promise<Book[]> => {
   const { data, error } = await db
     .from("books")
-    .select("*")
+    .select(BOOK_SELECT)
     .eq("uploaded_by", teacherId)
     .order("created_at", { ascending: false });
   if (error) throw error;

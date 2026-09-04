@@ -5,12 +5,12 @@ import {
   BookOpen, Plus, MoreHorizontal, Trash2, X, Upload, Check, Library, Search, Video,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { resolveSubject, insertBook, subjects as subjectConfig } from "@snr/core";
+import { resolveSubject, insertBook } from "@snr/core";
 import type { Book } from "@snr/core";
 import { getBookFileUrl, deleteBook as deleteBookAction } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
-import { resolveSubjectIcon } from "@/components/SubjectIcon";
+import { subjectIconByName } from "@/lib/subject-icons";
 import { parseVideoUrl } from "@/lib/video-url";
 import { mySchoolStoragePath } from "@snr/core";
 import { ModalPortal } from "@/components/ModalPortal";
@@ -38,10 +38,6 @@ const SUBJECT_GRADIENTS: Record<string, [string, string]> = {
 // 5 отбираемых в форме "Добавить книгу", см. BOOK_SUBJECT_KEYS ниже) —
 // нужен, чтобы карточки/бейджи существующих книг с любым subject корректно
 // резолвили label, а не падали на raw-key fallback.
-const SUBJECT_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(subjectConfig).map(([key, cfg]) => [key, cfg.label]),
-);
-
 function getBookGradient(subject: string): string {
   const [from, to] = SUBJECT_GRADIENTS[subject] ?? ["#64748B", "#334155"];
   return `linear-gradient(135deg, ${from}, ${to})`;
@@ -90,8 +86,8 @@ function TeacherBookDetailModal({
   opening: boolean;
 }) {
   const [visible, setVisible] = useState(false);
-  const style = resolveSubject({ slug: book.subject });
-  const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
+  const style = resolveSubject({ catalog: book.catalog, slug: book.subject });
+  const BookSubjectIcon = subjectIconByName(style.icon);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true));
@@ -152,7 +148,7 @@ function TeacherBookDetailModal({
                   className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
                   style={{ background: style.color + "22", color: style.color }}
                 >
-                  <BookSubjectIcon className="h-3.5 w-3.5" /> {SUBJECT_LABELS[book.subject] ?? book.subject}
+                  <BookSubjectIcon className="h-3.5 w-3.5" /> {style.label}
                 </span>
                 <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                   {book.book_type}
@@ -776,8 +772,14 @@ export function TeacherBooksView({
   }
 
   const subjects = useMemo(() => {
-    const set = new Set(books.map((b) => b.subject).filter(Boolean));
-    return Array.from(set) as string[];
+    // Ключ отбора — по-прежнему слаг (он в колонке книги), а подпись берётся
+    // у справочника: школа переименует предмет — переименуется и в фильтре.
+    const map = new Map<string, string>();
+    for (const b of books) {
+      if (!b.subject || map.has(b.subject)) continue;
+      map.set(b.subject, resolveSubject({ catalog: b.catalog, slug: b.subject }).label);
+    }
+    return Array.from(map, ([value, label]) => ({ value, label }));
   }, [books]);
 
   const displayed = useMemo(() => {
@@ -888,7 +890,7 @@ export function TeacherBooksView({
               >
                 <option value="all">Все предметы</option>
                 {subjects.map((s) => (
-                  <option key={s} value={s}>{SUBJECT_LABELS[s] ?? s}</option>
+                  <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>
             )}
@@ -916,7 +918,8 @@ export function TeacherBooksView({
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {displayed.map((book) => {
-              const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
+              const style = resolveSubject({ catalog: book.catalog, slug: book.subject });
+              const BookSubjectIcon = subjectIconByName(style.icon);
               const isOwn = book.uploaded_by === initialTeacherId;
               const isDeleting = deleting === book.id;
               const coverUrl = coverUrls[book.id];

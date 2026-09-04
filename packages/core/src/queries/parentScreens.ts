@@ -17,6 +17,7 @@
  * ложь.
  */
 import type { Db } from "../supabase/factory";
+import { BOOK_SELECT } from "./helpers";
 import type { Book, LessonWithSubject } from "../types";
 import { tashkentDayKey } from "../utils/date";
 import { getChildCountedGrades, getChildGradesSummary } from "./parent";
@@ -68,7 +69,7 @@ export type LibraryBookItem = Book & { isFavorite: boolean };
 export async function getLibraryBooks(db: Db, studentId: string | null): Promise<LibraryBookItem[]> {
   const { data, error } = await db
     .from("books")
-    .select("*")
+    .select(BOOK_SELECT)
     .order("created_at", { ascending: false });
   if (error) throw error;
   const books = (data ?? []) as unknown as Book[];

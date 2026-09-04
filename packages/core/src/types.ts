@@ -1123,7 +1123,15 @@ export type Book = {
   id: string;
   title: string;
   author: string | null;
+  /** Устаревший слаг предмета из пятёрки в коде. Уходит в конце цепочки
+   *  заходов; пока — запасной путь для книг без пары в справочнике. */
   subject: string;
+  /** Миграция 254 — предмет книги строкой справочника школы
+   *  (school_subjects). NULL = пары нет, показ падает на слаг. */
+  catalog_id?: string | null;
+  /** Сама строка справочника, если выборка её подтянула (BOOK_SELECT).
+   *  Подпись, значок и цвет книги берутся отсюда через resolveSubject. */
+  catalog?: { name: string | null; icon: string | null; color: string | null } | null;
   book_type: BookType;
   description: string | null;
   cover_storage_path: string | null;

@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Star, BookOpen, Library, X, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { resolveSubject, addBookFavorite, removeBookFavorite, subjects as subjectConfig } from "@snr/core";
+import { resolveSubject, addBookFavorite, removeBookFavorite } from "@snr/core";
 import type { Book } from "@snr/core";
 import { getBookFileUrl } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
-import { resolveSubjectIcon } from "@/components/SubjectIcon";
+import { subjectIconByName } from "@/lib/subject-icons";
 
 // ── Config ──────────────────────────────────────────────────────────────
 
@@ -26,17 +26,9 @@ const SUBJECT_GRADIENTS: Record<string, [string, string]> = {
   russian:     ["#DC2626", "#991B1B"],
 };
 
-// Держим labels в синхроне с apps/web/app/teacher/books/TeacherBooksView.tsx
-// и единым конфигом @snr/core (packages/core/src/config/subjects.ts) — этот
-// файл раньше был отдельным хардкод-дублем без "русский" и с расхождением
-// "Английский" vs канонического "Английский язык"; фильтр здесь сам по себе
-// data-driven (список берётся из реальных книг), но лейблы резолвились
-// именно отсюда, так что рассинхрон был бы виден при первой же книге с
-// новым предметом.
-const SUBJECT_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(subjectConfig).map(([key, cfg]) => [key, cfg.label]),
-);
-
+// 04.09.2026 — своей таблицы подписей здесь больше нет. Подпись, значок и
+// цвет предмета книги отдаёт resolveSubject: сперва строка справочника школы
+// (books.catalog_id, миграция 254), и только если пары нет — словарь по слагу.
 function getBookGradient(subject: string): string {
   const [from, to] = SUBJECT_GRADIENTS[subject] ?? ["#64748B", "#334155"];
   return `linear-gradient(135deg, ${from}, ${to})`;
@@ -75,8 +67,8 @@ function BookDetailModal({
 }) {
   const [visible, setVisible] = useState(false);
   const [optimisticFav, setOptimisticFav] = useState(isFavorite);
-  const style = resolveSubject({ slug: book.subject });
-  const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
+  const style = resolveSubject({ catalog: book.catalog, slug: book.subject });
+  const BookSubjectIcon = subjectIconByName(style.icon);
 
   useEffect(() => { setOptimisticFav(isFavorite); }, [isFavorite]);
   useEffect(() => {
@@ -155,7 +147,7 @@ function BookDetailModal({
                 className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
                 style={{ background: style.color + "22", color: style.color }}
               >
-                <BookSubjectIcon className="h-3.5 w-3.5" /> {SUBJECT_LABELS[book.subject] ?? book.subject}
+                <BookSubjectIcon className="h-3.5 w-3.5" /> {style.label}
               </span>
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                 {book.book_type}
@@ -228,7 +220,8 @@ function BookCard({
   onSelect: (bookId: string) => void;
   onToggleFavorite: (bookId: string) => void;
 }) {
-  const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
+  const style = resolveSubject({ catalog: book.catalog, slug: book.subject });
+  const BookSubjectIcon = subjectIconByName(style.icon);
 
   return (
     <div className="group cursor-pointer" onClick={() => onSelect(book.id)}>
@@ -321,8 +314,14 @@ export function BooksView({
   }, [toast]);
 
   const subjects = useMemo(() => {
-    const set = new Set(books.map((b) => b.subject).filter(Boolean));
-    return Array.from(set) as string[];
+    // Ключ отбора — по-прежнему слаг (он в колонке книги), а подпись берётся
+    // у справочника: школа переименует предмет — переименуется и в фильтре.
+    const map = new Map<string, string>();
+    for (const b of books) {
+      if (!b.subject || map.has(b.subject)) continue;
+      map.set(b.subject, resolveSubject({ catalog: b.catalog, slug: b.subject }).label);
+    }
+    return Array.from(map, ([value, label]) => ({ value, label }));
   }, [books]);
 
   const toggleFavorite = useCallback(
@@ -454,7 +453,7 @@ export function BooksView({
           >
             <option value="all">Все предметы</option>
             {subjects.map((s) => (
-              <option key={s} value={s}>{SUBJECT_LABELS[s] ?? s}</option>
+              <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
         )}

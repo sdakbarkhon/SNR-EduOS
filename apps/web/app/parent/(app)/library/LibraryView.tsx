@@ -11,7 +11,7 @@
 
 import { useState, useTransition } from "react";
 import type { Locale } from "@snr/core";
-import { getDictionary, subjects as subjectConfig } from "@snr/core";
+import { getDictionary, resolveSubject } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import type { LibraryBookItem } from "@/lib/parent-queries";
 import { GlassCard } from "../v2/GlassCard";
@@ -65,7 +65,7 @@ export function LibraryView({ books }: { books: LibraryBookItem[] }) {
 
             <GlassCard radius={22} style={{ paddingLeft: 14, paddingRight: 14 }}>
               {books.map((b, idx) => {
-                const subjectLabel = subjectConfig[b.subject]?.label ?? b.subject;
+                const subjectLabel = resolveSubject({ catalog: b.catalog, slug: b.subject }).label;
                 const hasContent = Boolean(b.file_storage_path || b.external_url);
                 return (
                   <div
