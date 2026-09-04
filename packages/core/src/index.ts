@@ -9,6 +9,7 @@ export * from "./schemas";
 export * from "./queries";
 export * from "./presenters";
 export * from "./config/subjects";
+export * from "./config/subject-resolver";
 export * from "./i18n";
 export * from "./utils/date";
 export * from "./utils/schoolTime";
