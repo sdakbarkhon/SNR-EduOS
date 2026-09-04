@@ -4,6 +4,7 @@ import { getMyTeacher } from "@/lib/cached-queries";
 import { redirect } from "next/navigation";
 import { safeQuery } from "@/lib/safe-query";
 import { CurriculumPlansView } from "./CurriculumPlansView";
+import type { PlanDraft } from "./PlanDraftsList";
 
 // Пара «группа + предмет» может прийти доводом адреса: так сюда ведёт отказ
 // массового создания уроков — «плана нет, вот где его завести». Читаем её
@@ -22,12 +23,35 @@ export default async function TeacherCurriculumPage({
   const teacher = (await safeQuery(getMyTeacher(db), null, "TeacherCurriculumPage.teacher")).data;
   if (!teacher) redirect("/login");
 
-  const [plansRes, groupsRes] = await Promise.all([
+  const [plansRes, groupsRes, draftsRes] = await Promise.all([
     safeQuery(getCurriculumPlansForTeacher(db, teacher.id), [], "TeacherCurriculumPage.plans"),
     safeQuery(Promise.resolve(getTeacherGroups(db)), [], "TeacherCurriculumPage.groups"),
+    // ЗАКАЗЫ НА РАЗБОР УЧЕБНИКА. Читаются на сервере, а не в браузере, чтобы
+    // учитель, вернувшийся на вкладку через час, увидел готовый файл сразу, а
+    // не после первого ответа подписки. Правило доступа отдаёт только свои —
+    // отбирать по учителю здесь нечего.
+    safeQuery(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (db as any)
+        .from("curriculum_plan_drafts")
+        .select("id, title, status, progress_percent, progress_stage, error_message, result_path, topics_count, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20)
+        // safeQuery ловит БРОШЕННОЕ, а запрос supabase отказ возвращает полем.
+        // Без этого превращения отказ пришёл бы сюда «успехом», и на экране
+        // вместо списка оказался бы объект ответа.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .then((r: any) => {
+          if (r.error) throw new Error(r.error.message);
+          return (r.data ?? []) as PlanDraft[];
+        }),
+      [] as PlanDraft[],
+      "TeacherCurriculumPage.drafts",
+    ),
   ]);
   const plans = plansRes.data;
   const groupsRaw = groupsRes.data;
+  const drafts = draftsRes.data;
 
   // Промт: раньше группы фильтровались по groups.teacher_id ("куратор
   // группы") — до миграции 109 это было корректно (1 куратор = все уроки
@@ -61,6 +85,7 @@ export default async function TeacherCurriculumPage({
   return (
     <CurriculumPlansView
       plans={plans}
+      drafts={drafts}
       groups={groups.map((g) => ({ id: g.id, name: g.name }))}
       subjects={subjects.map((s) => ({ id: s.id, name: s.name, group_id: s.group_id }))}
       teacherId={teacher.id}

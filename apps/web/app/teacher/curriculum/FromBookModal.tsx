@@ -3,14 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, BookOpen, AlertTriangle } from "lucide-react";
-import { getDictionary, getBooksForPlanSource, getCurriculumPlanForGroupSubject } from "@snr/core";
+import { getDictionary, getBooksForPlanSource } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { ModalPortal } from "@/components/ModalPortal";
 
 /**
- * Сборка учебного плана из учебника.
+ * СОЗДАНИЕ УЧЕБНОГО ПЛАНА ИЗ УЧЕБНИКА — ЗАКАЗ НА ФАЙЛ. 06.09.2026.
+ *
+ * Окно больше НЕ СОЗДАЁТ ПЛАН. Оно заводит заказ: модель читает книгу и
+ * складывает темы файлом, а план родится позже — когда учитель принесёт этот
+ * файл кнопкой «Загрузить учебный план». Разбор минутный, поэтому окно
+ * закрывается сразу, а ход виден в списке файлов на самом экране планов.
+ *
+ * ПОЭТОМУ ЗДЕСЬ НЕТ ВОПРОСА ПРО ЗАМЕНУ. Раньше окно спрашивало, заменять ли
+ * существующий план на эту пару: план создавался немедленно и занимал её.
+ * Заказ пары не занимает и ничего не затирает — спрашивать не о чем.
+ *
+ * Прежний разбор из учебника.
  *
  * ИСТОЧНИК — БИБЛИОТЕКА ШКОЛЫ, а не загрузка файла. Причин две. Учебники в
  * библиотеке уже лежат — в демо-школе это одиннадцать настоящих PDF, от 140 КБ
@@ -30,12 +41,15 @@ export function FromBookModal({
   groups,
   subjects,
   onClose,
+  onStarted,
 }: {
   groups: Array<{ id: string; name: string }>;
   /** Минимум, который нужен окну: чем полнее тип, тем сильнее оно привязано
    *  к форме родительского экрана без всякой на то причины. */
   subjects: Array<{ id: string; name: string; group_id: string }>;
   onClose: () => void;
+  /** Заказ принят. true — он уже шёл, второй не завёлся. */
+  onStarted?: (ужеШёл: boolean) => void;
 }) {
   const { locale } = useLocale();
   const dict = getDictionary(locale as Locale);
@@ -67,37 +81,28 @@ export function FromBookModal({
     setBusy(true);
     setError("");
     try {
-      // План на пару (группа, предмет) уникален. Если он уже есть, спрашиваем
-      // про замену тем же способом, что и загрузка файла плана.
-      const existing = await getCurriculumPlanForGroupSubject(db, groupId, subjectId).catch(() => null);
       const book = books?.find((b) => b.id === bookId);
       const group = groups.find((g) => g.id === groupId);
       const subject = subjects.find((s) => s.id === subjectId);
 
-      // У пары (группа, предмет) план уникален. Спрашиваем прямо, как и
-      // загрузка файла плана: молча затирать чужую работу нельзя.
-      if (existing && !window.confirm(d.replaceConfirm.replace("{n}", String(existing.topics.length)))) {
-        setBusy(false);
-        return;
-      }
-
-      const res = await fetch("/api/curriculum-plans/create-from-book", {
+      const res = await fetch("/api/curriculum-plans/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           groupId, subjectId, bookId,
-          // НЕ ПЕРЕВОДИТСЯ НАМЕРЕННО: это значение уходит в тело запроса и ложится
-          // в базу названием плана. Переведи его — и заголовок в базе станет
-          // зависеть от языка того, кто загружал, а у соседа по школе план
-          // назовётся иначе. Текст на экране и данные в базе — разные вещи.
+          // НЕ ПЕРЕВОДИТСЯ НАМЕРЕННО: это значение уходит в тело запроса и
+          // ложится в базу названием заказа и именем скачиваемого файла.
+          // Переведи — и у соседа по школе тот же файл назовётся иначе.
           title: `${subject?.name ?? book?.title ?? "Предмет"} — ${group?.name ?? "Группа"}`,
-          replaceExistingId: existing?.id ?? null,
         }),
       });
       const json = await res.json();
       if (!res.ok) { setError(json.error || d.fromBookFailed); return; }
+      // Окно закрывается сразу: ждать нечего, ход разбора виден в списке
+      // файлов, и вкладку можно закрыть вовсе.
       onClose();
-      router.push(`/teacher/curriculum/${json.id}`);
+      onStarted?.(json.alreadyRunning === true);
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : d.fromBookNetworkError);
     } finally {

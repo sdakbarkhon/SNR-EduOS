@@ -76,8 +76,8 @@ export async function POST(req: NextRequest) {
   if (!groupId || !subjectId || !storagePath || !sourceFileType || !title) {
     return NextResponse.json({ error: "groupId, subjectId, storagePath, sourceFileType, title required" }, { status: 400 });
   }
-  if (sourceFileType !== "pdf" && sourceFileType !== "docx") {
-    return NextResponse.json({ error: "sourceFileType must be pdf or docx" }, { status: 400 });
+  if (sourceFileType !== "pdf" && sourceFileType !== "docx" && sourceFileType !== "csv") {
+    return NextResponse.json({ error: "sourceFileType must be pdf, docx or csv" }, { status: 400 });
   }
 
   // Та же проверка владения, что parse/route.ts (RLS can_manage_curriculum_plan,
@@ -98,7 +98,13 @@ export async function POST(req: NextRequest) {
 
   const input = {
     groupId, subjectId, teacherId: teacher.id, title,
-    sourceFileUrl: storagePath, sourceFileType: sourceFileType as "pdf" | "docx",
+    sourceFileUrl: storagePath,
+    // CSV ЛОЖИТСЯ ПУСТЫМ ТИПОМ. Колонка source_file_type знает только pdf и
+    // docx — проверка стоит в базе с миграции 116, а наш файл плана появился
+    // позже. Расширять её ради поля, которое НИГДЕ не читается, значит заводить
+    // миграцию на пустом месте: расширение видно в source_file_url, а «наш это
+    // файл или чужой» разборщик определяет по метке внутри файла.
+    sourceFileType: sourceFileType === "csv" ? null : (sourceFileType as "pdf" | "docx"),
   };
 
   let plan;

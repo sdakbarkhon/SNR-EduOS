@@ -318,9 +318,13 @@ export async function uploadCurriculumPlanFile(
   const safeExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
   const id = crypto.randomUUID();
   const path = await mySchoolStoragePath(db, input.teacherId, safeExt ? `${id}.${safeExt}` : id);
+  // ТИП ДЛЯ ХРАНИЛИЩА — ПО РАСШИРЕНИЮ, А НЕ ПО СЛОВУ БРАУЗЕРА. Windows с
+  // установленным Excel отдаёт .csv как application/vnd.ms-excel; бакет
+  // сверяет присланный тип со своим списком и такой файл не примет.
+  const тип = safeExt === "csv" ? "text/csv" : (input.file.type || undefined);
   const { error } = await db.storage
     .from("curriculum-plans")
-    .upload(path, input.file, { contentType: input.file.type || undefined });
+    .upload(path, input.file, { contentType: тип });
   if (error) throw error;
   return { storagePath: path };
 }
@@ -409,7 +413,10 @@ export async function createCurriculumPlanProcessing(
     teacherId: string;
     title: string;
     sourceFileUrl: string;
-    sourceFileType: "pdf" | "docx";
+    /** NULL допустим: колонка знает только pdf и docx (проверка из миграции
+     *  116), а наш CSV-файл плана появился позже. Поле нигде не читается, тип
+     *  файла виден по расширению в source_file_url. */
+    sourceFileType: "pdf" | "docx" | null;
   },
 ): Promise<CurriculumPlan> {
   const plan = await (db as AnyDb)

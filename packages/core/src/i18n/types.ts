@@ -71,6 +71,22 @@ export interface Dictionary {
   curriculum: {
     replaceConfirm: string;
     fromBookBtn: string;
+    draftStageDownload: string;
+    draftStageExtract: string;
+    draftStageOutline: string;
+    draftStageModel: string;
+    draftStageFile: string;
+    draftStageQueued: string;
+    draftRunningHint: string;
+    draftsTitle: string;
+    draftsEmpty: string;
+    draftsNext: string;
+    draftDownload: string;
+    draftTopicsCount: string;   // "{n}"
+    draftFailedTitle: string;
+    draftRetry: string;
+    draftAlreadyRunning: string;
+    draftStarted: string;
     fromBookTitle: string;
     fromBookSubtitle: string;
     fromBookPick: string;

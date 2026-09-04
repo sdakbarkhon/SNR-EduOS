@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { FromBookModal } from "./FromBookModal";
+import { PlanDraftsList, type PlanDraft } from "./PlanDraftsList";
 import { ModalPortal } from "@/components/ModalPortal";
 
 type GroupItem = { id: string; name: string };
@@ -21,11 +22,14 @@ export function CurriculumPlansView({
   subjects,
   teacherId,
   preselect = null,
+  drafts = [],
 }: {
   plans: CurriculumPlanWithTopics[];
   groups: GroupItem[];
   subjects: SubjectItem[];
   teacherId: string;
+  /** Заказы на разбор учебника — файлы, а не планы. */
+  drafts?: PlanDraft[];
   /** Пришли по ссылке «создать план для этой пары» — окно загрузки
    *  открывается сразу и с уже выбранными группой и предметом. */
   preselect?: { groupId: string; subjectId: string } | null;
@@ -38,6 +42,16 @@ export function CurriculumPlansView({
   const plans = initialPlans;
   const [uploadModal, setUploadModal] = useState(preselect !== null);
   const [bookModal, setBookModal] = useState(false);
+  const [заказТост, setЗаказТост] = useState<string | null>(null);
+  // Кнопка гаснет, пока заказ жив: второй рубеж против двойного нажатия.
+  // Первый — уникальный индекс в базе, он же и решает спор двух вкладок.
+  const естьЖивойЗаказ = drafts.some((x) => x.status === "queued" || x.status === "running");
+
+  useEffect(() => {
+    if (!заказТост) return;
+    const t = setTimeout(() => setЗаказТост(null), 5000);
+    return () => clearTimeout(t);
+  }, [заказТост]);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
 
@@ -68,11 +82,15 @@ export function CurriculumPlansView({
             className="w-full rounded-xl border border-slate-200 bg-white/60 py-2.5 pl-11 pr-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
         </div>
-        {/* Два источника плана рядом: готовый файл — и учебник, если готового
-            плана нет вовсе. Разбирает их один и тот же механизм. */}
+        {/* ДВЕ РАЗНЫЕ КНОПКИ, А НЕ ДВА ВХОДА В ОДНО. 06.09.2026.
+            Первая создаёт ФАЙЛ с темами из учебника и плана не заводит;
+            вторая заводит план из файла — нашего или чужого. Между ними
+            учитель открывает файл и правит темы. */}
         <button
           onClick={() => setBookModal(true)}
-          className="flex shrink-0 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100 active:scale-95"
+          disabled={естьЖивойЗаказ}
+          title={естьЖивойЗаказ ? d.draftRunningHint : undefined}
+          className="flex shrink-0 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <BookOpen className="h-4 w-4" /> {d.fromBookBtn}
         </button>
@@ -107,6 +125,14 @@ export function CurriculumPlansView({
         </div>
       )}
 
+      {заказТост && (
+        <p className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
+          {заказТост}
+        </p>
+      )}
+
+      <PlanDraftsList initialDrafts={drafts} />
+
       {uploadModal && (
         <UploadPlanModal
           groups={groups}
@@ -122,6 +148,7 @@ export function CurriculumPlansView({
           groups={groups}
           subjects={subjects}
           onClose={() => setBookModal(false)}
+          onStarted={(ужеШёл) => setЗаказТост(ужеШёл ? d.draftAlreadyRunning : d.draftStarted)}
         />
       )}
     </PageContainer>
@@ -146,10 +173,15 @@ function topicWord(n: number, d: Dictionary["curriculum"]): string {
 // парсинг с прогресс-баром (см. CurriculumPlanDetailView.tsx). Разбор/правка
 // тем происходит ПОСЛЕ, на странице плана (там уже есть полный редактор тем).
 
-function isPdfOrDocxFile(f: File): "pdf" | "docx" | null {
+function isPlanFile(f: File): "pdf" | "docx" | "csv" | null {
   const name = f.name.toLowerCase();
   if (f.type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
   if (f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) return "docx";
+  // 06.09.2026 — НАШ СОБСТВЕННЫЙ ФАЙЛ. Кнопка «Создать учебный план» отдаёт
+  // темы CSV-файлом; принеся его обратно, учитель получает план БЕЗ вызова
+  // модели — разбор узнаёт его по метке в первой строке. Чужой CSV сюда тоже
+  // попадёт и уйдёт в модель, как pdf и docx: метки в нём не будет.
+  if (f.type === "text/csv" || name.endsWith(".csv")) return "csv";
   return null;
 }
 
@@ -171,7 +203,7 @@ function UploadPlanModal({
   const [groupId, setGroupId] = useState(preselect?.groupId ?? "");
   const [subjectId, setSubjectId] = useState(preselect?.subjectId ?? "");
   const [file, setFile] = useState<File | null>(null);
-  const [sourceFileType, setSourceFileType] = useState<"pdf" | "docx" | null>(null);
+  const [sourceFileType, setSourceFileType] = useState<"pdf" | "docx" | "csv" | null>(null);
   const [fileError, setFileError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -182,7 +214,7 @@ function UploadPlanModal({
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
     if (!f) { setFile(null); setSourceFileType(null); setFileError(""); return; }
-    const kind = isPdfOrDocxFile(f);
+    const kind = isPlanFile(f);
     if (!kind) { setFileError(d.errorPdfDocxOnly); setFile(null); setSourceFileType(null); e.target.value = ""; return; }
     if (f.size > 20 * 1024 * 1024) { setFileError(d.errorFileTooLarge); setFile(null); setSourceFileType(null); e.target.value = ""; return; }
     setFileError("");
@@ -260,7 +292,7 @@ function UploadPlanModal({
               )}
               <div>
                 <label className={labelCls}>{d.fieldPlanFile}</label>
-                <input ref={fileRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleFileChange} />
+                <input ref={fileRef} type="file" accept=".pdf,.docx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleFileChange} />
                 <button onClick={() => fileRef.current?.click()}
                   className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
                   <FileText className="h-5 w-5" />
