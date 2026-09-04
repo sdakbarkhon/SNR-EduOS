@@ -79,8 +79,15 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyDb = db as any;
   const { data: teacher } = await anyDb
-    .from("teachers").select("id, school_id").eq("user_id", user.id).single();
+    .from("teachers").select("id").eq("user_id", user.id).single();
   if (!teacher) return NextResponse.json({ error: "Not a teacher" }, { status: 403 });
+
+  // ШКОЛА — ВЫБРАННАЯ, А НЕ ДОМАШНЯЯ. Здесь стояло teachers.school_id, и у
+  // учителя двух школ заказ ложился в домашнюю: правило чтения меряет
+  // current_school_id(), поэтому свой же заказ переставал ему показываться.
+  // Колонка школы у заказов без умолчания, значит подставить её обязан код.
+  const { data: школа } = await anyDb.rpc("current_school_id");
+  if (!школа) return NextResponse.json({ error: "Не удалось определить школу" }, { status: 400 });
 
   const body = (await req.json()) as { groupId?: string; subjectId?: string; bookId?: string; title?: string };
   const groupId = body.groupId?.trim();
@@ -141,7 +148,7 @@ export async function POST(req: NextRequest) {
   const { data: draft, error } = await служебный
     .from("curriculum_plan_drafts")
     .insert({
-      school_id: teacher.school_id,
+      school_id: школа,
       teacher_id: teacher.id,
       group_id: groupId,
       subject_id: subjectId,

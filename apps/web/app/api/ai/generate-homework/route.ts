@@ -251,7 +251,7 @@ export async function POST(req: NextRequest) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: teacher } = await (db as any)
-    .from("teachers").select("id, school_id").eq("user_id", user.id).single();
+    .from("teachers").select("id").eq("user_id", user.id).single();
   if (!teacher) return NextResponse.json({ error: "Not a teacher" }, { status: 403 });
 
   const body = (await req.json()) as Partial<RequestBody>;
@@ -280,16 +280,22 @@ export async function POST(req: NextRequest) {
   // Данных мало или группа не передана — строка пустая, и промпт получается
   // ровно прежним.
   let groupContext = "";
+  // ШКОЛА ДЛЯ УЧЁТА РАСХОДА — У ГРУППЫ, для которой составляется задание. Тот
+  // же приём, что у соседа по генерации этапов: он берёт её у урока. Из строки
+  // учителя брать нельзя — там домашняя школа, и у работающего в двух школах
+  // счёт за генерацию уходил бы не той школе.
+  let школаЗадания: string | null = null;
   if (body.groupId) {
     try {
       const schoolNow = await getMySchoolNow(db);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const [{ data: grp }, { data: subj }] = await Promise.all([
-        (db as any).from("groups").select("name").eq("id", body.groupId).maybeSingle(),
+        (db as any).from("groups").select("name, school_id").eq("id", body.groupId).maybeSingle(),
         body.subjectId
           ? (db as any).from("subjects").select("name").eq("id", body.subjectId).maybeSingle()
           : Promise.resolve({ data: null }),
       ]);
+      школаЗадания = (grp as { school_id?: string } | null)?.school_id ?? null;
       const perf = await getGroupPerformance(db, {
         groupName: (grp as { name: string } | null)?.name ?? "",
         subjectKey: subjectFilterKey((subj as { name: string } | null)?.name),
@@ -321,9 +327,18 @@ export async function POST(req: NextRequest) {
   let lastError = "";
 
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
+    // Группу могли не передать вовсе — тогда спрашиваем школу у базы. Ручка
+    // ходит сессией учителя, а не служебным ключом, поэтому здесь функция
+    // отвечает; строку без школы оставлять незачем.
+    if (!школаЗадания) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: своя } = await (db as any).rpc("current_school_id");
+      школаЗадания = (своя as string | null) ?? null;
+    }
+
     const { data: parsed, error } = await generateJSON<GenRaw>(prompt, schema, {
       temperature: 0.8,
-      usage: { task: AI_TASKS.generateHomework, teacherId: teacher.id, schoolId: teacher.school_id ?? null },
+      usage: { task: AI_TASKS.generateHomework, teacherId: teacher.id, schoolId: школаЗадания },
     });
 
     if (error || !parsed) {

@@ -555,18 +555,18 @@ export async function updateTeacher(
     email: `${data.username.trim().toLowerCase()}@teachers.snr.local`,
   });
 
-  // Школа берётся у САМОГО учителя: суперадмин правит чужую, своей у него нет.
+  // ШКОЛА ТА, В КОТОРОЙ ДЕЙСТВУЕТ ВЫЗЫВАЮЩИЙ, а не та, что записана у учителя.
+  //
+  // Здесь читалась строка teachers с пояснением «суперадмин правит чужую, своей
+  // у него нет». Пояснение устарело: verifyStaff до этого места чистого
+  // суперадмина не пускает вовсе, а школу отдаёт всегда — админу его
+  // собственную, менеджеру ту, что он назвал и которая проверена по schools.
+  // Разница вылезает на учителе двух школ: менеджер, работая во второй,
+  // создавал назначения в ДОМАШНЕЙ школе учителя. Строкой выше assertSameSchool
+  // уже поручился, что учитель относится к callerSchoolId.
   let итог = { assigned: 0, failed: [] as string[] };
   if (data.assignments?.length) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: owner, error: ownErr } = await (sb as any)
-      .from("teachers").select("school_id").eq("id", teacherId).single();
-    if (ownErr) throw ownErr;
-    итог = await assignSubjectsToTeacher(
-      teacherId,
-      (owner as { school_id: string }).school_id,
-      data.assignments,
-    );
+    итог = await assignSubjectsToTeacher(teacherId, callerSchoolId, data.assignments);
   }
 
   return итог;

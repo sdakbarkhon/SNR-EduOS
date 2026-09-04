@@ -359,18 +359,23 @@ const CATEGORY_BY_KIND: Readonly<Record<string, NotificationCategory>> = {
  *  доступа требует school_id = current_school_id(), а колонка умолчания не
  *  имеет. Спрашиваем по очереди четыре таблицы — свою строку в своей видит
  *  каждая роль. На чтении этот запрос не выполняется ни разу. */
+/**
+ * ШКОЛА ТЕКУЩЕГО ЧЕЛОВЕКА — ОДНИМ ВОПРОСОМ К БАЗЕ.
+ *
+ * Раньше здесь перебирались четыре таблицы (students, teachers, parents,
+ * admins) и бралась школа ИЗ СТРОКИ. У учителя, работающего в двух школах,
+ * это домашняя школа, а не выбранная: отключённая во второй школе категория
+ * уведомлений привязывалась не к той школе и там не действовала.
+ *
+ * `current_school_id()` отвечает на тот же вопрос и знает про выбор. Для
+ * ученика, родителя и админа ответ прежний — школа у них одна.
+ */
 async function resolveMySchoolId(db: Db): Promise<string | null> {
   const sb = db as any;
   const { data: { user } } = await db.auth.getUser();
   if (!user) return null;
-  const источники = ["students", "teachers", "parents", "admins"];
-  const ответы = await Promise.all(источники.map((t) =>
-    sb.from(t).select("school_id").eq("user_id", user.id).maybeSingle()));
-  for (const r of ответы) {
-    const id = (r?.data as { school_id?: string } | null)?.school_id;
-    if (id) return id;
-  }
-  return null;
+  const { data } = await sb.rpc("current_school_id");
+  return (data as string | null) ?? null;
 }
 
 /**
