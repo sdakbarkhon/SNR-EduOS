@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Play, Send, Download, FileText, Loader2, Code2,
 } from "lucide-react";
-import {
+import { resolveSubject,
   getDictionary, getSubjectStyle, submitProgrammingHomework, getHomeworkTestsUrl,
   homeworkSubmissionStatusKind,
   type HomeworkWithSubmission, type Locale,
@@ -29,9 +29,12 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   // subject_id (migration 107) is the real subject; group.subject is a legacy
   // placeholder ("programming" for every group) — fall back to it only when
   // subject_id is null (pre-migration rows).
-  const fallbackStyle = getSubjectStyle(hw.group.subject);
-  const subjectLabel = hw.subjectName ?? fallbackStyle.label;
-  const subjectColor = hw.subjectColor ?? fallbackStyle.color;
+  const subjectStyle = resolveSubject({
+    catalog: { name: hw.subjectName, color: hw.subjectColor },
+    slug: hw.group.subject,
+  });
+  const subjectLabel = subjectStyle.label;
+  const subjectColor = subjectStyle.color;
   const lang = hw.programming_language ?? "python";
 
   const [studentId, setStudentId] = useState<string | null>(null);

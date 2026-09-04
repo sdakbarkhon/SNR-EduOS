@@ -7,7 +7,7 @@ import {
   CalendarDays, ChevronDown, Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { insertMaterial, getDictionary, type Locale, subjectLabelOf } from "@snr/core";
+import { resolveSubject, insertMaterial, getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
 import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
@@ -923,7 +923,7 @@ export function TeacherMaterialsView({
             >
               <option value="all">Все предметы</option>
               {subjects.map((s) => (
-                <option key={s} value={s}>{subjectLabelOf(s)}</option>
+                <option key={s} value={s}>{resolveSubject({ slug: s }).label}</option>
               ))}
             </select>
             <ChevronDown className={`${FILTER_CHEVRON} ${filterSubject !== "all" ? "text-blue-400" : "text-slate-400"}`} />

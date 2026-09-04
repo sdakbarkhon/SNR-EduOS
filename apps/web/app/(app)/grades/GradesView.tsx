@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Star, BookOpen, ClipboardCheck, Trophy, ChevronRight, CheckCircle2, ArrowUpDown } from "lucide-react";
-import { getDictionary, getSubjectConfig, gradeCategory, averageOf, countsTowardAverage, subjectLabelOf } from "@snr/core";
+import { resolveSubject, getDictionary, gradeCategory, averageOf, countsTowardAverage } from "@snr/core";
 import type { Dictionary, Locale, StudentGradeItem } from "@snr/core";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { useLocale } from "@/components/LocaleProvider";
@@ -78,7 +78,7 @@ function sortGrades(items: StudentGradeItem[], sort: SortValue): StudentGradeIte
     case "date_asc": arr.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")); break;
     case "grade_desc": arr.sort((a, b) => (b.grade5 ?? -1) - (a.grade5 ?? -1)); break;
     case "grade_asc": arr.sort((a, b) => (a.grade5 ?? -1) - (b.grade5 ?? -1)); break;
-    case "subject": arr.sort((a, b) => subjectLabelOf(a.subject).localeCompare(subjectLabelOf(b.subject))); break;
+    case "subject": arr.sort((a, b) => resolveSubject({ slug: a.subject }).label.localeCompare(resolveSubject({ slug: b.subject }).label)); break;
     default: arr.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")); break;
   }
   return arr;
@@ -301,7 +301,7 @@ export function GradesView({ grades, error = false }: Props) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[18px] font-black leading-tight text-slate-900">
-              {bestSubject ? subjectLabelOf(bestSubject.subject) : t.noSubjectYet}
+              {bestSubject ? resolveSubject({ slug: bestSubject.subject }).label : t.noSubjectYet}
             </p>
             <p className="mt-1 text-[13px] font-bold text-slate-500">{t.bestSubjectLabel}</p>
           </div>
@@ -342,7 +342,7 @@ export function GradesView({ grades, error = false }: Props) {
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button onClick={() => setSubjectFilter("all")} className={pillClass(subjectFilter === "all")}>{t.allSubjects}</button>
             {subjects.map((s) => {
-              const cfg = getSubjectConfig(s);
+              const cfg = resolveSubject({ slug: s });
               const { Icon: SubjIcon } = resolveSubjectIcon(s);
               return (
                 <button key={s} onClick={() => setSubjectFilter(s)} className={pillClass(subjectFilter === s)}>
@@ -392,7 +392,7 @@ export function GradesView({ grades, error = false }: Props) {
                           {g.kind === "lesson" ? `${d.lesson.kindLesson}: ${g.title}` : g.title}
                         </p>
                         <p className="mt-0.5 truncate text-[12.5px] font-semibold text-slate-400">
-                          {subjectLabelOf(g.subject)}
+                          {resolveSubject({ slug: g.subject }).label}
                           {/* Результат отдельно от оценки. «2» за квиз — это
                               два верных ответа из четырёх, а не двойка; без
                               этого числа оценка выглядит хуже, чем есть.
@@ -447,7 +447,7 @@ export function GradesView({ grades, error = false }: Props) {
               <h3 className="text-[17px] font-extrabold text-slate-900">{t.avgBySubjectTitle}</h3>
               <div className="mt-4 flex flex-col gap-4">
                 {subjectAverages.map(({ subject, avg }) => {
-                  const cfg = getSubjectConfig(subject);
+                  const cfg = resolveSubject({ slug: subject });
                   return (
                     <div key={subject}>
                       <div className="mb-2 flex items-center gap-2.5">

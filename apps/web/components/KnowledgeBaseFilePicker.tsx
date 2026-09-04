@@ -31,7 +31,7 @@ import {
   Plus, Upload, Trash2,
 } from "lucide-react";
 import type { MaterialWithGroup, Book, LibraryMaterialWithDetails } from "@snr/core";
-import {
+import { resolveSubject,
   getDictionary,
   getLibraryMaterials,
   createLibraryMaterial,
@@ -314,7 +314,7 @@ export function LibraryUploadModal({
                         }`}
                       >
                         <SubjectIcon subject={s} size={18} />
-                        {getSubjectStyle(s).label}
+                        {resolveSubject({ slug: s }).label}
                       </button>
                     );
                   })}
@@ -322,7 +322,7 @@ export function LibraryUploadModal({
               ) : (
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
                   <SubjectIcon subject={activeSlug} size={22} />
-                  {getSubjectStyle(activeSlug).label}
+                  {resolveSubject({ slug: activeSlug }).label}
                 </div>
               )}
             </div>
@@ -547,7 +547,7 @@ export function LibraryVideoLinkModal({
                         }`}
                       >
                         <SubjectIcon subject={s} size={18} />
-                        {getSubjectStyle(s).label}
+                        {resolveSubject({ slug: s }).label}
                       </button>
                     );
                   })}
@@ -555,7 +555,7 @@ export function LibraryVideoLinkModal({
               ) : (
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
                   <SubjectIcon subject={activeSlug} size={22} />
-                  {getSubjectStyle(activeSlug).label}
+                  {resolveSubject({ slug: activeSlug }).label}
                 </div>
               )}
             </div>

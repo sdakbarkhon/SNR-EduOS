@@ -7,7 +7,7 @@ import type {
   ProgressSubject,
   ProgressViewData,
 } from "./ProgressView";
-import { getSubjectStyle, averageOf, countsTowardAverage } from "@snr/core";
+import { resolveSubject, averageOf, countsTowardAverage } from "@snr/core";
 import { ProgressView } from "./ProgressView";
 import { getParentContext } from "@/lib/parent-context";
 import {
@@ -146,7 +146,7 @@ export default async function ParentProgressPage() {
     // здесь, чтобы все производные срезы (список предметов, средние по
     // предмету, динамика) считались по одному и тому же ключу.
     .map((g) => ({
-      subject: g.subject ? getSubjectStyle(g.subject).label : "",
+      subject: g.subject ? resolveSubject({ slug: g.subject }).label : "",
       grade5: g.grade5,
       month: tashkentDay(g.date).slice(0, 7),
     }));

@@ -1,4 +1,4 @@
-import { getSubjectConfig } from "@snr/core";
+import { resolveSubject } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { Avatar } from "./Avatar";
@@ -24,7 +24,7 @@ export async function TeacherHeaderInfo() {
     // называть так каждого учителя с незаполненной карточкой — неправда.
     // Брать «Программирование» из legacy groups.subject тоже нельзя: оно
     // одинаковое во всех группах.
-    teacherSubtitle = teacher.subject_slug ? getSubjectConfig(teacher.subject_slug).label : "";
+    teacherSubtitle = teacher.subject_slug ? resolveSubject({ slug: teacher.subject_slug }).label : "";
   } catch (err) {
     console.error("[TeacherHeaderInfo] getMyTeacher failed:", err);
   }

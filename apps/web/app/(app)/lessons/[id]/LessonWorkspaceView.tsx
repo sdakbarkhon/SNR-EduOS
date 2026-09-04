@@ -8,7 +8,7 @@ import {
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Users, Hash,
   Maximize2, Minimize2, Bot, RefreshCw, LogOut, Play, CheckCircle2, Loader2,
 } from "lucide-react";
-import {
+import { resolveSubject,
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask, endLesson,
   getMaterialDownloadUrl, setActiveStage,
@@ -313,7 +313,10 @@ export function LessonWorkspaceView({
   const router = useRouter();
   const db = createClient();
   const showToast = useToast();
-  const style = getSubjectStyle(lesson.group.subject);
+  const style = resolveSubject({
+    catalog: { name: lesson.subjectName, color: lesson.subjectColor },
+    slug: lesson.group.subject,
+  });
 
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
@@ -1057,7 +1060,7 @@ export function LessonWorkspaceView({
       <LessonHeaderBar
         subjectIcon={lesson.subjectIcon}
         subjectColor={lesson.subjectColor}
-        subjectName={lesson.subjectName ?? style.label}
+        subjectName={style.label}
         title={heroTitle}
         actions={
           <>

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Star, BookOpen, Library, X, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getSubjectStyle, addBookFavorite, removeBookFavorite, subjects as subjectConfig } from "@snr/core";
+import { resolveSubject, addBookFavorite, removeBookFavorite, subjects as subjectConfig } from "@snr/core";
 import type { Book } from "@snr/core";
 import { getBookFileUrl } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
@@ -75,7 +75,7 @@ function BookDetailModal({
 }) {
   const [visible, setVisible] = useState(false);
   const [optimisticFav, setOptimisticFav] = useState(isFavorite);
-  const style = getSubjectStyle(book.subject);
+  const style = resolveSubject({ slug: book.subject });
   const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
 
   useEffect(() => { setOptimisticFav(isFavorite); }, [isFavorite]);

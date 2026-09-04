@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, FileText, Link as LinkIcon, Maximize2, Minimize2, Paperclip, Play, Send, Video, X } from "lucide-react";
-import {
+import { resolveSubject,
   getDictionary,
   getSubjectStyle,
   submitHomeworkWithFile,
@@ -642,9 +642,12 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
   // subject_id (migration 107) is the real subject; group.subject is a legacy
   // placeholder ("programming" for every group) — fall back to it only when
   // subject_id is null (pre-migration rows).
-  const fallbackStyle = getSubjectStyle(hw.group.subject);
-  const subjectLabel = hw.subjectName ?? fallbackStyle.label;
-  const subjectColor = hw.subjectColor ?? fallbackStyle.color;
+  const subjectStyle = resolveSubject({
+    catalog: { name: hw.subjectName, color: hw.subjectColor },
+    slug: hw.group.subject,
+  });
+  const subjectLabel = subjectStyle.label;
+  const subjectColor = subjectStyle.color;
 
   const dueLabel = hw.due_date
     ? new Date(hw.due_date).toLocaleDateString("ru-RU", {

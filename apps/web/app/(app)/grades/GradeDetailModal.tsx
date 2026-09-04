@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText, Download, ExternalLink } from "lucide-react";
-import { getSubjectConfig, getGradeSubmissionDetail, gradeCategory, subjectLabelOf } from "@snr/core";
+import { resolveSubject, getGradeSubmissionDetail, gradeCategory } from "@snr/core";
 import type { Dictionary, StudentGradeItem, GradeSubmissionDetail } from "@snr/core";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { createClient } from "@/lib/supabase/client";
@@ -32,7 +32,7 @@ export function GradeDetailModal({
   kindBadgeClass: string;
   onClose: () => void;
 }) {
-  const subjectLabel = subjectLabelOf(grade.subject);
+  const subjectLabel = resolveSubject({ slug: grade.subject }).label;
   // ВТОРОЙ КОПИИ ПРАВИЛА ЗДЕСЬ БОЛЬШЕ НЕТ. 03.09.2026.
   //
   // Стояла своя классификация по источнику, слово в слово повторявшая

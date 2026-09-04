@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Download, TrendingUp, TrendingDown, Award, AlertTriangle } from "lucide-react";
-import {
+import { resolveSubject,
   getDictionary,
   computeOverall, computeStudentStats, computeGroupStats, computeSubjectStats,
   filterByPeriod,
@@ -197,7 +197,7 @@ export function AnalyticsView({ facts }: { facts: AnalyticsFacts }) {
         {/* 26.08.2026: в списке стояли слаги латиницей — «english», «math»,
             «programming». Значение остаётся ключом, показывается название. */}
         <Select value={subject} onChange={setSubject} placeholder={t.anAllSubjects}
-          options={subjectNames.map((s) => ({ value: s, label: subjectLabelOf(s) }))} />
+          options={subjectNames.map((s) => ({ value: s, label: resolveSubject({ slug: s }).label }))} />
         <button
           onClick={exportCsv}
           disabled={stats.length === 0}
@@ -280,7 +280,7 @@ export function AnalyticsView({ facts }: { facts: AnalyticsFacts }) {
           <Table
             title={t.anSubjects} firstCol={t.anFilterSubject} labels={t}
             rows={subjectStats.map((s) => ({
-              key: s.subject, name: subjectLabelOf(s.subject),
+              key: s.subject, name: resolveSubject({ slug: s.subject }).label,
               cells: [fmt1(s.avgGrade), fmtPct(s.attendance), String(s.gradeCount), ""],
             }))}
             cols={[t.anColAvg, t.anColAttendance, t.anColGrades, ""]}

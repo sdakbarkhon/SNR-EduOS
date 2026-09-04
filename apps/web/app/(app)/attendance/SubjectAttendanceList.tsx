@@ -1,4 +1,4 @@
-import {
+import { resolveSubject,
   attendanceCalcAll,
   defaultLocale,
   getDictionary,
@@ -21,7 +21,7 @@ export function SubjectAttendanceList({ rows }: { rows: AttendanceWithLesson[] }
   return (
     <div className="flex flex-col gap-5">
       {bySubject.map(({ subject, pct }) => {
-        const style = getSubjectStyle(subject);
+        const style = resolveSubject({ slug: subject });
         return (
           <div key={subject} className="group flex flex-col gap-2">
             <div className="flex items-center gap-3">
@@ -33,7 +33,7 @@ export function SubjectAttendanceList({ rows }: { rows: AttendanceWithLesson[] }
               <span className="flex-1 text-[14px] font-medium text-gray-800">
                 {/* 26.08.2026: было style.label — «Предмет» для всего, чего
                     нет в каноническом списке. Теперь предмет проходит как есть. */}
-                {subjectLabelOf(subject)}
+                {style.label}
               </span>
               {/* % */}
               <span

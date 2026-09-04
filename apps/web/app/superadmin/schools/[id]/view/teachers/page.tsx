@@ -1,4 +1,4 @@
-import { subjectLabelOf } from "@snr/core";
+import { resolveSubject } from "@snr/core";
 import { schoolViewContext } from "@/lib/school-view";
 import { TableClient } from "../TableClient";
 
@@ -27,7 +27,7 @@ export default async function SchoolTeachersPage({ params }: { params: Promise<{
     username: t.username,
     // 26.08.2026: в колонке «Основной предмет» стоял сырой слаг — «english»,
     // «math», латиницей. У куратора (subject_slug пуст) была пустая ячейка.
-    subject: subjectLabelOf(t.subject_slug),
+    subject: resolveSubject({ slug: t.subject_slug }).label,
     subjects: [...(поУчителю.get(t.id) ?? [])].join(", "),
   }));
 

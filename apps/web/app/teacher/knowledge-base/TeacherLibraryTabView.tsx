@@ -28,7 +28,7 @@ import {
   Plus, Link as LinkIcon, Trash2, Search, Video, FileText, FileImage, File as FileIcon, Library, X, BookOpen,
 } from "lucide-react";
 import { useLocale } from "@/components";
-import { getDictionary, getSubjectStyle, deleteLibraryMaterial } from "@snr/core";
+import { resolveSubject, getDictionary, deleteLibraryMaterial } from "@snr/core";
 import type { Locale, LibraryMaterialWithDetails } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { FileViewerModal } from "@/components/FileViewerModal";
@@ -98,7 +98,7 @@ function LibraryMaterialDetailModal({
   opening: boolean;
 }) {
   const [visible, setVisible] = useState(false);
-  const style = material.subject_slug ? getSubjectStyle(material.subject_slug) : null;
+  const style = material.subject_slug ? resolveSubject({ slug: material.subject_slug }) : null;
   const isVideo = material.content_type !== "file";
 
   useEffect(() => {
@@ -384,7 +384,7 @@ export function TeacherLibraryTabView({
             >
               <option value="all">Все предметы</option>
               {subjectsPresent.map((s) => (
-                <option key={s} value={s}>{getSubjectStyle(s).label}</option>
+                <option key={s} value={s}>{resolveSubject({ slug: s }).label}</option>
               ))}
             </select>
           )}
@@ -406,7 +406,7 @@ export function TeacherLibraryTabView({
             const isVideo = m.content_type !== "file";
             const Icon = iconFor(m.file_type, isVideo);
             const isMine = m.uploaded_by === initialTeacherId;
-            const style = m.subject_slug ? getSubjectStyle(m.subject_slug) : null;
+            const style = m.subject_slug ? resolveSubject({ slug: m.subject_slug }) : null;
             return (
               <div key={m.id} className="group relative cursor-pointer" onClick={() => setSelectedId(m.id)}>
                 <div

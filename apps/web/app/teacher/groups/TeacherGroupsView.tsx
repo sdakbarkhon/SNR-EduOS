@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getDictionary, getSubjectConfig, pluralizeStudents, averageOf, groupClassLabel } from "@snr/core";
+import { resolveSubject, getDictionary, pluralizeStudents, averageOf, groupClassLabel } from "@snr/core";
 import type { Locale, TeacherGroupSubject } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { subjectIconByName } from "@/lib/subject-icons";
@@ -109,7 +109,7 @@ export function TeacherGroupsView({ groups, grades, attendance, subjects }: Prop
             // про класс, а предметы перечислены подписью. Ни одного — только класс.
             const single = groupSubjects.length === 1 ? groupSubjects[0] : null;
             const cls = groupClassLabel(group.name);
-            const color = single?.color ?? getSubjectConfig(null).color;
+            const color = resolveSubject({ catalog: single }).color;
             const GroupSubjectIcon = subjectIconByName(single?.icon);
             const title = single ? single.name : group.name;
             // У куратора настоящих предметов в группе нет вовсе (все его

@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   ChevronLeft, MapPin, Clock, CalendarX, Calendar, X, ListChecks, Play, BookOpen,
 } from "lucide-react";
-import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
+import { resolveSubject, formatTime, formatDate, getDictionary } from "@snr/core";
 import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview } from "@snr/core";
 import { useIsPastDayLesson } from "@/components/SchoolTimeProvider";
 import {
@@ -49,7 +49,10 @@ export function PreLessonView({
   const isPastDay = useIsPastDayLesson();
   const showToast = useToast();
   const dbRef = useRef<ReturnType<typeof createClient> | null>(null);
-  const style = getSubjectStyle(lesson.group.subject);
+  const style = resolveSubject({
+    catalog: { name: lesson.subjectName, color: lesson.subjectColor },
+    slug: lesson.group.subject,
+  });
 
   // Live clock (client-only — null on SSR to avoid hydration mismatch)
   const [nowMs, setNowMs] = useState<number | null>(null);
@@ -252,7 +255,7 @@ export function PreLessonView({
     } catch { /* noop */ }
   }
 
-  const heroTitle = lesson.subjectName ?? style.label;
+  const heroTitle = style.label;
   const timeRange = lesson.ends_at
     ? `${formatTime(lesson.starts_at)} — ${formatTime(lesson.ends_at)}`
     : formatTime(lesson.starts_at);

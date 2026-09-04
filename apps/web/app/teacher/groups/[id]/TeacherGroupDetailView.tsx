@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
+import { resolveSubject,
   getDictionary, getSubjectConfig, pluralizeStudents,
   groupClassLabel, averageOfGrades, countedGrades, studentStatus,
   formatDate, formatTime,
@@ -81,7 +81,7 @@ export function TeacherGroupDetailView({ group, students, subjects, grades, atte
   // предметов нет вовсе — все его тринадцать строк помечены is_stub, и
   // getTeacherGroupSubjects их отсеивает; тогда подписи о предмете не будет.
   const single = subjects.length === 1 ? subjects[0] : null;
-  const color = single?.color ?? getSubjectConfig(null).color;
+  const color = resolveSubject({ catalog: single }).color;
   const GroupSubjectIcon = subjectIconByName(single?.icon);
   const cls = groupClassLabel(group.name);
   const subjectLine = subjects.map((s) => s.name).join(", ");

@@ -5,7 +5,7 @@ import {
   Search, FileText, BookOpen, Link as LinkIcon,
   Video, FileImage, File, FolderOpen, X, CalendarDays, ChevronDown,
 } from "lucide-react";
-import { getDictionary, type Locale, type MaterialWithGroup, type LessonSlide, subjectLabelOf, subjectDisplay } from "@snr/core";
+import { resolveSubject, getDictionary, type Locale, type MaterialWithGroup, type LessonSlide, subjectLabelOf, subjectDisplay } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
 import {
@@ -332,7 +332,7 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
             >
               <option value="all">Все предметы</option>
               {subjects.map((s) => (
-                <option key={s} value={s}>{subjectLabelOf(s)}</option>
+                <option key={s} value={s}>{resolveSubject({ slug: s }).label}</option>
               ))}
             </select>
             <ChevronDown className={`${FILTER_CHEVRON} ${filterSubject !== "all" ? "text-blue-400" : "text-slate-400"}`} />

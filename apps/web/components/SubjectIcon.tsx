@@ -1,4 +1,4 @@
-import { getSubjectStyle } from "@snr/core";
+import { resolveSubject } from "@snr/core";
 import { subjectIconByName } from "@/lib/subject-icons";
 import type { LucideIcon } from "lucide-react";
 
@@ -10,7 +10,7 @@ import type { LucideIcon } from "lucide-react";
 
 /** Resolves a subject to its lucide icon + color, no wrapper/background — for embedding inside an already-styled container (colored tile, gradient cover). */
 export function resolveSubjectIcon(subject: string | null): { Icon: LucideIcon; color: string } {
-  const s = getSubjectStyle(subject);
+  const s = resolveSubject({ slug: subject });
   return { Icon: subjectIconByName(s.icon), color: s.color };
 }
 
@@ -21,7 +21,7 @@ export function SubjectIcon({
   subject: string | null;
   size?: number;
 }) {
-  const s = getSubjectStyle(subject);
+  const s = resolveSubject({ slug: subject });
   const Icon = subjectIconByName(s.icon);
   return (
     <span

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import {
+import { resolveSubject,
   getDictionary,
   getStudentAttendance,
   getSubjectStyle,
@@ -228,7 +228,7 @@ export function AttendanceView({
           >
             <option value="">{d.attendance.filterAllSubjects}</option>
             {subjectOptions.map((s) => (
-              <option key={s} value={s}>{subjectLabelOf(s)}</option>
+              <option key={s} value={s}>{resolveSubject({ slug: s }).label}</option>
             ))}
           </select>
           <ChevronRight className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rotate-90 h-3.5 w-3.5 text-gray-400" />
@@ -376,7 +376,7 @@ export function AttendanceView({
               </div>
               <div className="divide-y divide-slate-100">
                 {selectedDayRecords.map((row) => {
-                  const style = getSubjectStyle(row.subject);
+                  const style = resolveSubject({ slug: row.subject });
                   const timeLbl = new Date(row.lesson_date).toLocaleTimeString("ru-RU", {
                     hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent",
                   });
@@ -419,7 +419,7 @@ export function AttendanceView({
           ) : (
             <div className="divide-y divide-slate-100 max-h-[440px] overflow-y-auto">
               {sortedRecords.map((row) => {
-                const style = getSubjectStyle(row.subject);
+                const style = resolveSubject({ slug: row.subject });
                 const dateLbl = new Date(row.lesson_date).toLocaleDateString("ru-RU", {
                   day: "numeric", month: "short", timeZone: "Asia/Tashkent",
                 });

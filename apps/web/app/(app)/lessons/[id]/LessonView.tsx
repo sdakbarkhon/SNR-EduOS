@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, MapPin, Check, Eye, BookOpen, FileText, Clock, ClipboardList, Play } from "lucide-react";
 import type { StudentLessonView, LessonStageWithProgress, ContentType } from "@snr/core";
-import { getSubjectStyle } from "@snr/core";
+import { resolveSubject } from "@snr/core";
 import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
 import { PreLessonView } from "./PreLessonView";
 import { LessonWorkspaceView } from "./LessonWorkspaceView";
@@ -53,7 +53,10 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework, is
     return <LessonWorkspaceView lesson={lesson} materialUrls={materialUrls} studentId={studentId} isDemoSchool={isDemoSchool} />;
   }
 
-  const style = getSubjectStyle(lesson.group.subject);
+  const style = resolveSubject({
+    catalog: { name: lesson.subjectName, color: lesson.subjectColor },
+    slug: lesson.group.subject,
+  });
 
   const stages = [...lesson.stages].sort((a, b) => a.position - b.position);
 
@@ -122,7 +125,7 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework, is
       <LessonHeaderBar
         subjectIcon={lesson.subjectIcon}
         subjectColor={lesson.subjectColor}
-        subjectName={lesson.subjectName ?? style.label}
+        subjectName={style.label}
         title={heroTitle}
         actions={
           lesson.teacher && (

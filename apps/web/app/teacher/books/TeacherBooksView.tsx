@@ -5,7 +5,7 @@ import {
   BookOpen, Plus, MoreHorizontal, Trash2, X, Upload, Check, Library, Search, Video,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { insertBook, getSubjectStyle, subjects as subjectConfig } from "@snr/core";
+import { resolveSubject, insertBook, subjects as subjectConfig } from "@snr/core";
 import type { Book } from "@snr/core";
 import { getBookFileUrl, deleteBook as deleteBookAction } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
@@ -72,7 +72,7 @@ const BOOK_TYPES = ["Учебник", "Конспект", "Сборник", "С�
 // остаются в SUBJECT_LABELS выше, на случай если где-то в данных встретится
 // старое значение — только сам выбор в форме сужен).
 const BOOK_SUBJECT_KEYS = ["programming", "robotics", "math", "english", "russian"] as const;
-const SUBJECTS = BOOK_SUBJECT_KEYS.map((value) => ({ value, label: getSubjectStyle(value).label }));
+const SUBJECTS = BOOK_SUBJECT_KEYS.map((value) => ({ value, label: resolveSubject({ slug: value }).label }));
 
 // ── TeacherBookDetailModal ────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ function TeacherBookDetailModal({
   opening: boolean;
 }) {
   const [visible, setVisible] = useState(false);
-  const style = getSubjectStyle(book.subject);
+  const style = resolveSubject({ slug: book.subject });
   const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
 
   useEffect(() => {

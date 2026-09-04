@@ -9,7 +9,7 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
-import {
+import { resolveSubject,
   getDictionary,
   getHomeworkWithSubmissions,
   getSubjectStyle,
@@ -59,11 +59,13 @@ function subjectKeyOf(hw: HomeworkWithSubmission): string {
   return hw.subject_id ?? hw.group.subject;
 }
 function subjectStyleOf(hw: HomeworkWithSubmission): { label: string; color: string; icon?: string } {
-  if (hw.subject_id && hw.subjectName) {
-    return { label: hw.subjectName, color: hw.subjectColor ?? "#64748b", icon: hw.subjectIcon ?? undefined };
-  }
-  const fallback = getSubjectStyle(hw.group.subject);
-  return { label: fallback.label, color: fallback.color, icon: undefined };
+  const s = resolveSubject({
+    catalog: hw.subject_id ? { name: hw.subjectName, color: hw.subjectColor } : null,
+    slug: hw.group.subject,
+  });
+  // icon stays catalog-only: callers draw two initials when it is absent, and a
+  // book instead of those initials would be a downgrade, not a fallback.
+  return { label: s.label, color: s.color, icon: (s.source === "catalog" && hw.subjectIcon) || undefined };
 }
 
 export function HomeworkView({

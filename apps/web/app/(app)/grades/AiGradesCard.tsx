@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { getSubjectConfig, averageOf, countsTowardAverage, subjectLabelOf } from "@snr/core";
+import { resolveSubject, getSubjectConfig, averageOf, countsTowardAverage, subjectLabelOf } from "@snr/core";
 import type { StudentGradeItem } from "@snr/core";
 import { getGradesAdvice } from "@/app/actions/ai";
 
@@ -25,7 +25,7 @@ function buildSummary(grades: StudentGradeItem[]): string {
   bySub.forEach((items, subject) => {
     // 26.08.2026: getSubjectConfig отдавал «Предмет» для всего, чего нет в
     // каноническом списке — совет ИИ говорил «лучший предмет: Предмет».
-    const label = subjectLabelOf(subject);
+    const label = resolveSubject({ slug: subject }).label;
     const vals = items.map((g) => g.grade5).filter((v): v is number => v != null);
     const mean = averageOf(vals);
     const avg = mean != null ? mean.toFixed(1) : "нет";
