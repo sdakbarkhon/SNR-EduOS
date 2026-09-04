@@ -32,7 +32,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getHomeworkWithSubmissions, format, LOCALE_TAG, type HomeworkWithSubmission, type Dictionary } from "@snr/core";
+import { getHomeworkWithSubmissions, format, resolveSubject, LOCALE_TAG, type HomeworkWithSubmission, type Dictionary } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassCard, GlassCircleButton, InnerHeader, type StatusFamily } from "../../ui";
 import {
@@ -142,6 +142,15 @@ function toRealHomeworkRow(
   t: Dictionary["parentApp"],
   localeTag: string,
 ): RealHomeworkRow {
+  // 06.09.2026 — подпись, цвет и значок предмета идут через общий резолвер
+  // (packages/core/config/subject-resolver), тот же, что у веба: справочник
+  // первым, устаревший слаг группы — запасным. Раньше запасным путём была
+  // сама колонка groups.subject, а она с миграции 256 устарела и у новых
+  // групп пуста: задание осталось бы вовсе без подписи.
+  const предмет = resolveSubject({
+    catalog: { name: hw.subjectName, color: hw.subjectColor, icon: hw.subjectIcon },
+    slug: hw.group.subject,
+  });
   const isTest = hw.content_type === "test";
   const kind = isTest ? realTestStatusKind(hw.test_submission) : realSubmissionStatusKind(hw.submission?.status);
   // Заход 2, шаг 6 — числовая оценка (была скрыта в Шаге 5): добавляем к
@@ -166,9 +175,15 @@ function toRealHomeworkRow(
 
   return {
     id: hw.id,
-    subjectName: hw.subjectName ?? hw.group.subject ?? t.hw.subjectFallback,
-    subjectColor: hw.subjectColor ?? "#6366f1",
-    subjectIcon: hw.subjectIcon ?? null,
+    // Прочерка резолвера родителю показывать незачем — у него для этого есть
+    // своё слово, оно и остаётся.
+    subjectName: предмет.source === "fallback" && !hw.subjectName
+      ? t.hw.subjectFallback
+      : предмет.label,
+    subjectColor: hw.subjectColor ?? предмет.color,
+    // Значок — только настоящий, из справочника. Запасной книжкой подменять
+    // нельзя: место вызова рисует вместо неё две буквы названия, и это лучше.
+    subjectIcon: предмет.source === "catalog" ? предмет.icon : null,
     statusLabel,
     statusKind: kind,
     title: hw.title,

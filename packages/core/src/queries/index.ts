@@ -804,7 +804,10 @@ export const getChildMaterials = async (
   const groupIds = await getStudentGroupIds(db, studentId);
   const { data, error } = await db
     .from("course_materials")
-    .select("*, group:groups!inner(name, subject)")
+    // 06.09.2026 — как и у getMaterials: строка справочника вместо устаревшей
+    // колонки groups.subject. Родительский контур читает те же таблицы, и
+    // подпись предмета у него должна считаться так же.
+    .select("*, group:groups!inner(name), catalog:school_subjects(name, icon, color)")
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
     .order("created_at", { ascending: false });
   if (error) throw error;

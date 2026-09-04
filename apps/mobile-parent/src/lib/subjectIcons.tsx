@@ -24,6 +24,7 @@ import {
   BookOpen,
   BookText,
   Calculator,
+  CircuitBoard,
   Code,
   Dumbbell,
   FlaskConical,
@@ -34,6 +35,7 @@ import {
   Library,
   Lightbulb,
   Map,
+  Microscope,
   Monitor,
   Music,
   Palette,
@@ -46,7 +48,19 @@ import {
 
 type IconProps = { size?: number; color?: string; strokeWidth?: number };
 
-/** Те же двадцать три имени, что предлагает админский выбор значка предмета. */
+/**
+ * ТЕ ЖЕ ДВАДЦАТЬ ПЯТЬ ИМЁН, ЧТО У ВЕБА. 06.09.2026.
+ *
+ * Реестр здесь свой — и останется своим: графика у react-native другая, и
+ * тянуть сюда веб-иконки нельзя. Но НАБОР ИМЁН обязан совпадать: имя значка
+ * приходит из базы (`school_subjects.icon`), выбирает его админ из списка
+ * веба, и всё, чего здесь нет, у родителя молча превращается в две буквы
+ * названия.
+ *
+ * Так и было с `CircuitBoard` и `Microscope`: веб их завёл 04.09.2026, а сюда
+ * они не доехали — «Схемотехника» и «Science» рисовались буквами. Теперь
+ * добавлены. Третьего реестра не заводим: этот пополняется.
+ */
 const SUBJECT_ICONS: Record<string, ComponentType<IconProps>> = {
   Calculator,
   BookOpen,
@@ -71,6 +85,8 @@ const SUBJECT_ICONS: Record<string, ComponentType<IconProps>> = {
   Lightbulb,
   Target,
   Rocket,
+  CircuitBoard,
+  Microscope,
 };
 
 /**

@@ -27,7 +27,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { format, getBookSignedUrl, getLibraryBooks, type LibraryBookItem } from "@snr/core";
+import { format, getBookSignedUrl, getLibraryBooks, resolveSubject, type LibraryBookItem } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassBlur, glassSurface } from "../../ui/glass";
 import {
@@ -74,6 +74,35 @@ function coverGradient(subject: string): [string, string] {
   let sum = 0;
   for (let i = 0; i < subject.length; i += 1) sum = (sum + subject.charCodeAt(i)) % 997;
   return COVER_COLORS[sum % COVER_COLORS.length];
+}
+
+/**
+ * ВИД КНИГИ — ИЗ СПРАВОЧНИКА ШКОЛЫ. 06.09.2026.
+ *
+ * `books.subject` — устаревшая строка, и в ней лежит СЛАГ: родитель видел на
+ * чипе «programming», а не «Программирование». С миграции 254 у книги есть
+ * ссылка на справочник, и подпись с цветом берутся оттуда — тем же
+ * резолвером, что и в вебе.
+ *
+ * Пары в справочнике нет — остаётся прежний вид: подпись строкой и цвет,
+ * посчитанный от неё. Это ровно то, что было до сегодняшнего дня.
+ */
+function darken(hex: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `#${[16, 8, 0]
+    .map((сдвиг) => Math.round(((n >> сдвиг) & 0xff) * 0.62))
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function bookLook(book: LibraryBookItem): { label: string; colors: [string, string] } {
+  const s = resolveSubject({ catalog: book.catalog, slug: book.subject });
+  return {
+    label: s.label,
+    colors: s.source === "catalog" ? [s.color, darken(s.color)] : coverGradient(book.subject),
+  };
 }
 
 function SearchIcon({ color }: { color: string }) {
@@ -154,8 +183,8 @@ function SectionCap({ children }: { children: string }) {
   );
 }
 
-function SubjectPill({ subject, small }: { subject: string; small?: boolean }) {
-  const [, deep] = coverGradient(subject);
+function SubjectPill({ label, colors, small }: { label: string; colors: [string, string]; small?: boolean }) {
+  const deep = colors[1];
   const rgb = hexToRgbCsv(deep);
   return (
     <View
@@ -170,7 +199,7 @@ function SubjectPill({ subject, small }: { subject: string; small?: boolean }) {
       }}
     >
       <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: small ? 8.5 : 9.5, color: deep }}>
-        {subject}
+        {label}
       </Text>
     </View>
   );
@@ -238,8 +267,7 @@ function LibCardSurface({
   );
 }
 
-function CoverPlaque({ subject, size, busy }: { subject: string; size: number; busy: boolean }) {
-  const gradient = coverGradient(subject);
+function CoverPlaque({ gradient, size, busy }: { gradient: [string, string]; size: number; busy: boolean }) {
   return (
     <LinearGradient
       colors={gradient}
@@ -278,9 +306,10 @@ function BookCard({
 }) {
   const { tokens } = useTheme();
   const hasContent = Boolean(book.file_storage_path || book.external_url);
+  const look = bookLook(book);
   return (
     <LibCardSurface onPress={onPress} style={wide ? undefined : { width: 130 }}>
-      <CoverPlaque subject={book.subject} size={wide ? 72 : 60} busy={busy} />
+      <CoverPlaque gradient={look.colors} size={wide ? 72 : 60} busy={busy} />
       <Text numberOfLines={2} style={{ fontFamily: fonts.manrope800, fontSize: 10.5, lineHeight: 10.5 * 1.3, color: tokens.ink1 }}>
         {book.title}
       </Text>
@@ -293,7 +322,7 @@ function BookCard({
         <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fonts.manrope700, fontSize: 8.5, color: tokens.ink3 }}>
           {hasContent ? (book.isFavorite ? favLabel : book.book_type) : noFileLabel}
         </Text>
-        <SubjectPill subject={book.subject} small />
+        <SubjectPill label={look.label} colors={look.colors} small />
       </View>
     </LibCardSurface>
   );
@@ -324,7 +353,19 @@ export default function LibraryScreen() {
   const state = useChildQuery(realChildId, (db, id) => getLibraryBooks(db, id));
   const books = useMemo(() => state.data ?? [], [state.data]);
 
-  const subjects = useMemo(() => [...new Set(books.map((b) => b.subject))].sort(), [books]);
+  // Чипы предметов: ключ отбора — прежняя строка книги (по ней и фильтруем),
+  // подпись и цвет — из справочника через резолвер.
+  const subjects = useMemo(() => {
+    const карта = new Map<string, { label: string; color: string }>();
+    for (const b of books) {
+      if (!b.subject || карта.has(b.subject)) continue;
+      const look = bookLook(b);
+      карта.set(b.subject, { label: look.label, color: look.colors[1] });
+    }
+    return [...карта.entries()]
+      .map(([key, v]) => ({ key, ...v }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [books]);
   const favorites = useMemo(() => books.filter((b) => b.isFavorite), [books]);
   const rows = useMemo(
     () => (filter === "all" ? books : books.filter((b) => b.subject === filter)),
@@ -527,11 +568,11 @@ export default function LibraryScreen() {
               />
               {subjects.map((s) => (
                 <FilterChip
-                  key={s}
-                  label={s}
-                  active={filter === s}
-                  activeColor={coverGradient(s)[1]}
-                  onPress={() => setFilter(s)}
+                  key={s.key}
+                  label={s.label}
+                  active={filter === s.key}
+                  activeColor={s.color}
+                  onPress={() => setFilter(s.key)}
                 />
               ))}
             </ScrollView>
