@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { FromBookModal } from "./FromBookModal";
-import { PlanDraftsList, type PlanDraft } from "./PlanDraftsList";
+import { PlanDraftsList, usePlanDrafts, type PlanDraft } from "./PlanDraftsList";
 import { ModalPortal } from "@/components/ModalPortal";
 
 type GroupItem = { id: string; name: string };
@@ -43,9 +43,9 @@ export function CurriculumPlansView({
   const [uploadModal, setUploadModal] = useState(preselect !== null);
   const [bookModal, setBookModal] = useState(false);
   const [заказТост, setЗаказТост] = useState<string | null>(null);
-  // Кнопка гаснет, пока заказ жив: второй рубеж против двойного нажатия.
-  // Первый — уникальный индекс в базе, он же и решает спор двух вкладок.
-  const естьЖивойЗаказ = drafts.some((x) => x.status === "queued" || x.status === "running");
+  // Заказы держит общий хук: список ими рисует, экран — гасит первую кнопку.
+  // Свой снимок у каждого означал бы кнопку, которая гаснет и не оживает.
+  const { drafts: заказы, живые: естьЖивойЗаказ, обновить: обновитьЗаказы } = usePlanDrafts(drafts);
 
   useEffect(() => {
     if (!заказТост) return;
@@ -131,7 +131,7 @@ export function CurriculumPlansView({
         </p>
       )}
 
-      <PlanDraftsList initialDrafts={drafts} />
+      <PlanDraftsList drafts={заказы} />
 
       {uploadModal && (
         <UploadPlanModal
@@ -148,7 +148,12 @@ export function CurriculumPlansView({
           groups={groups}
           subjects={subjects}
           onClose={() => setBookModal(false)}
-          onStarted={(ужеШёл) => setЗаказТост(ужеШёл ? d.draftAlreadyRunning : d.draftStarted)}
+          onStarted={(ужеШёл) => {
+            setЗаказТост(ужеШёл ? d.draftAlreadyRunning : d.draftStarted);
+            // Не ждём ни серверного обновления, ни первого тика опроса:
+            // строка заказа должна появиться сразу, как закрылось окно.
+            void обновитьЗаказы();
+          }}
         />
       )}
     </PageContainer>

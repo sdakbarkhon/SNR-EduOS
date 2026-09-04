@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { разобратьВТемы } from "@/lib/curriculum-parse";
 import { темыВCsv } from "@/lib/curriculum-csv";
+import { schoolStoragePath } from "@snr/core";
 
 /**
  * ФОН ЗАКАЗА: книга -> темы -> ФАЙЛ. 06.09.2026.
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: draft, error: draftErr } = await anyDb
     .from("curriculum_plan_drafts")
-    .select("id, teacher_id, group_id, book_id, status")
+    .select("id, school_id, teacher_id, group_id, book_id, status")
     .eq("id", draftId)
     .maybeSingle();
   if (draftErr) return NextResponse.json({ error: draftErr.message }, { status: 500 });
@@ -63,7 +64,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .update({ status: "running", progress_stage: stage, progress_percent: percent })
       .eq("id", draftId);
   };
-  const путь = `${draft.teacher_id}/drafts/${draftId}.csv`;
+  // ПУТЬ СОБИРАЕТСЯ ОБЩЕЙ ФУНКЦИЕЙ, А НЕ СТРОКОЙ НА МЕСТЕ. Соглашение из
+  // packages/core/src/storage/path.ts: первый сегмент — школа, дальше как
+  // раньше. Без префикса файл считался бы наследием демо-школы, а правило
+  // «своей папки» отсчитывало бы владельца не от того сегмента.
+  const путь = schoolStoragePath(String(draft.school_id), String(draft.teacher_id), "drafts", `${draftId}.csv`);
   // Занято ли место под файл: если да, любой отказ обязан его освободить.
   let занято = false;
   const отказ = async (причина: string) => {

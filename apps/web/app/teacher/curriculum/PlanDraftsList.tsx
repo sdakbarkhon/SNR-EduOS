@@ -44,15 +44,18 @@ export type PlanDraft = {
   created_at: string;
 };
 
-export function PlanDraftsList({ initialDrafts }: { initialDrafts: PlanDraft[] }) {
-  const { locale } = useLocale();
-  const d = getDictionary(locale as Locale).curriculum;
+/**
+ * ЖИВОЙ СПИСОК ЗАКАЗОВ. Хук, а не состояние внутри списка.
+ *
+ * ПОЧЕМУ ХУК. Заказы нужны ДВОИМ: списку — чтобы рисовать, экрану — чтобы
+ * гасить первую кнопку, пока заказ жив. Если состояние живёт внутри списка,
+ * экран остаётся при серверном снимке: кнопка гаснет по router.refresh() и
+ * больше не оживает, потому что «готово» приходит опросом внутрь списка, а
+ * экран об этом не знает. Учителю пришлось бы жать F5.
+ */
+export function usePlanDrafts(initialDrafts: PlanDraft[]) {
   const db = createClient();
-
   const [drafts, setDrafts] = useState(initialDrafts);
-  const [скачан, setСкачан] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-
   useEffect(() => { setDrafts(initialDrafts); }, [initialDrafts]);
 
   const живые = drafts.some((x) => x.status === "queued" || x.status === "running");
@@ -71,6 +74,11 @@ export function PlanDraftsList({ initialDrafts }: { initialDrafts: PlanDraft[] }
 
   // Подписка на свои заказы. Правило доступа отдаёт только их, поэтому
   // фильтровать на клиенте нечего.
+  //
+  // СЕГОДНЯ ОНА МОЛЧИТ. Таблицы заказов нет в публикации supabase_realtime, и
+  // ни одного события канал не приносит — всю работу делает опрос ниже.
+  // Оставлена намеренно: строка начнёт работать в тот день, когда таблицу в
+  // публикацию добавят, и искать это место заново не придётся.
   useRealtimeChannel(
     живые ? "plan-drafts" : null,
     "curriculum_plan_drafts",
@@ -88,6 +96,16 @@ export function PlanDraftsList({ initialDrafts }: { initialDrafts: PlanDraft[] }
     const id = setInterval(() => { void обновить(); }, 5000);
     return () => clearInterval(id);
   }, [живые, обновить]);
+
+  return { drafts, живые, обновить };
+}
+
+export function PlanDraftsList({ drafts }: { drafts: PlanDraft[] }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale).curriculum;
+  const db = createClient();
+  const [скачан, setСкачан] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   async function скачать(draft: PlanDraft) {
     if (!draft.result_path) return;

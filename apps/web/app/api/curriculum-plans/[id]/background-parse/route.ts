@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { разобратьВТемы } from "@/lib/curriculum-parse";
-import { этоНашФайл, csvВТемы } from "@/lib/curriculum-csv";
+import { этоНашФайл, csvВТемы, файлВТекст } from "@/lib/curriculum-csv";
 import {
   updateCurriculumPlanProgress, markCurriculumPlanReady, markCurriculumPlanError,
   updateCurriculumPlanStage, markCurriculumPlanPreview,
@@ -98,7 +98,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // что посчитано. Признак — метка в первой строке; нет метки, файл чужой,
     // и он разбирается как раньше.
     if (!fromBook) {
-      const текст = buffer.toString("utf-8");
+      // Не buffer.toString("utf-8"): русский Excel умеет сохранить наш файл
+      // в windows-1251, и слепое чтение превратило бы темы в кракозябры молча.
+      const текст = файлВТекст(buffer);
       if (этоНашФайл(текст)) {
         const свои = csvВТемы(текст);
         if (свои.length === 0) throw new Error("В файле нет ни одной темы");
