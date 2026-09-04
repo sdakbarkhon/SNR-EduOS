@@ -23,7 +23,6 @@ import {
   type StudentGradeItem,
   averageOf,
   countsTowardAverage,
-  getSubjectKeyByLabel,
   tashkentDayKey,
   tashkentDayOfYear,
   subjectFilterKey,

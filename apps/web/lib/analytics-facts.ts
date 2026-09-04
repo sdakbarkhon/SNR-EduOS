@@ -24,7 +24,7 @@
 // задан, КАЖДЫЙ запрос несёт .eq("school_id", …) — ровно как это делают все
 // десять экранов просмотра школы (см. lib/school-view.ts).
 
-import { getStudentGrades, getSubjectKeyByLabel } from "@snr/core";
+import { getStudentGrades, subjectFilterKey } from "@snr/core";
 import type { AnalyticsInput } from "@snr/core";
 
 export type AnalyticsFactsBase = AnalyticsInput & {
@@ -89,7 +89,7 @@ export async function collectAnalyticsFacts(
   // отсутствием: вопрос здесь «был ли ученик на уроке», а не «виноват ли».
   //
   // ПРЕДМЕТ ПРИВОДИТСЯ К ТОМУ ЖЕ КЛЮЧУ, ЧТО И У ОЦЕНОК. Сбор оценок резолвит
-  // предмет через getSubjectKeyByLabel («Русский язык» → russian), а в записи
+  // предмет через subjectFilterKey (это само название), а в записи
   // посещаемости лежит название как есть. Без приведения таблица предметов
   // распадается надвое: строки со средним баллом без посещаемости и наоборот.
   type AttRow = {
@@ -99,7 +99,7 @@ export async function collectAnalyticsFacts(
   const attendance = ((attendanceRes.data ?? []) as AttRow[]).map((a) => ({
     studentId: a.student_id,
     groupName: a.lesson?.group?.name ?? "",
-    subject: getSubjectKeyByLabel(a.lesson?.subject?.name) ?? "",
+    subject: subjectFilterKey(a.lesson?.subject?.name),
     date: a.lesson?.starts_at ?? "",
     present: a.status === "present",
   })).filter((a) => a.date);
@@ -123,7 +123,7 @@ export async function collectAnalyticsFacts(
     return {
       studentId: s.student_id,
       groupName: h?.group?.name ?? "",
-      subject: getSubjectKeyByLabel(h?.subject?.name) ?? "",
+      subject: subjectFilterKey(h?.subject?.name),
       date: s.submitted_at ?? "",
     };
   }).filter((s) => s.date);
@@ -148,7 +148,7 @@ export async function collectAnalyticsFacts(
       overdue.push({
         studentId,
         groupName: h.group?.name ?? "",
-        subject: getSubjectKeyByLabel(h.subject?.name) ?? "",
+        subject: subjectFilterKey(h.subject?.name),
         date: due,
       });
     }

@@ -6,9 +6,9 @@ import {
   defaultLocale,
   getAttendanceWithLesson,
   getDictionary,
-  getSubjectStyle,
   type AttendanceWithLesson,
 } from "@snr/core";
+import { getSubjectStyle } from "../../lib/subject-style";
 import { colors } from "@snr/ui-tokens";
 import { Screen, SubjectIcon } from "../../components";
 import { getSupabase } from "../../lib/supabase";

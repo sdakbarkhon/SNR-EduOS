@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { resolveSubject, getSubjectConfig, averageOf, countsTowardAverage, subjectLabelOf } from "@snr/core";
+import { resolveSubject, averageOf, countsTowardAverage } from "@snr/core";
 import type { StudentGradeItem } from "@snr/core";
 import { getGradesAdvice } from "@/app/actions/ai";
 

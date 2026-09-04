@@ -4,7 +4,6 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, Code2, FileText, ClipboardCheck, Layers, Globe, Puzzle, type LucideIcon } from "lucide-react";
 import { resolveSubject,
   getDictionary,
-  getSubjectStyle,
   homeworkCategory,
   deadlineUrgency,
   type ContentType,

@@ -697,8 +697,12 @@ export type AttendanceWithLesson = {
     ends_at: string | null;
     group_id: string;
     topic: string | null;
+    /** Предмет урока из справочника (lessons.subject_id). Отсюда берётся и
+     *  группировка посещаемости, и вид плитки. */
+    subject?: { name: string | null; icon: string | null; color: string | null } | null;
     group: {
       id: string;
+      /** Устаревшая колонка группы. Не читается: см. миграцию 256. */
       subject: string;
     };
   };

@@ -8,7 +8,6 @@ import { resolveSubject,
   filterByPeriod,
   MIN_GRADES_FOR_VERDICT, EXCELLENT_FROM, LOW_GRADE_BELOW, OVERDUE_FROM,
   TREND_DELTA, MIN_GRADES_PER_HALF, ATTENDANCE_LOW_THRESHOLD,
-  subjectLabelOf,
 } from "@snr/core";
 import type { Locale, AnalyticsInput, RiskFlag, StudentStat } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";

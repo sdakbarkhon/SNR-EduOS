@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Briefcase, ChevronLeft, Trash2, Calendar, Check, Download, Pencil, ChevronDown, FileText } from "lucide-react";
 import { FALLBACK_SUBJECT_COLOR } from "@/components/LessonSubjectIcon";
 import {
-  getDictionary, getSubjectStyle, deleteProject, gradeProjectSubmission, getProjectAttachmentUrl,
+  getDictionary, deleteProject, gradeProjectSubmission, getProjectAttachmentUrl,
   type Locale, type ProjectWithStages, type ProjectSubmissionWithStudent,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";

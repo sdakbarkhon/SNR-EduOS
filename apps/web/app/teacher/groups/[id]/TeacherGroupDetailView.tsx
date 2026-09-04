@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { resolveSubject,
-  getDictionary, getSubjectConfig, pluralizeStudents,
+  getDictionary, pluralizeStudents,
   groupClassLabel, averageOfGrades, countedGrades, studentStatus,
   formatDate, formatTime,
 } from "@snr/core";

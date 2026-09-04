@@ -38,7 +38,6 @@ import { resolveSubject,
   deleteLibraryMaterial,
   getMyTeacher,
   getMyGroups,
-  getSubjectStyle,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components";

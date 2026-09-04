@@ -4,7 +4,7 @@ import { generateJSON } from "@/lib/ai/gemini-client";
 import { AI_TASKS } from "@/lib/ai/usage";
 import { getGroupPerformance, groupPerformanceHomeworkHint } from "@/lib/ai/group-performance";
 import { getMySchoolNow } from "@/lib/school-time-server";
-import { getSubjectKeyByLabel } from "@snr/core";
+import { subjectFilterKey } from "@snr/core";
 import {
   buildHomeworkFilePrompt, buildHomeworkTestPrompt, buildHomeworkProgrammingPrompt, buildHomeworkBundlePrompt,
   buildHomeworkCodeCompletionPrompt,
@@ -292,7 +292,7 @@ export async function POST(req: NextRequest) {
       ]);
       const perf = await getGroupPerformance(db, {
         groupName: (grp as { name: string } | null)?.name ?? "",
-        subjectKey: getSubjectKeyByLabel((subj as { name: string } | null)?.name) ?? "",
+        subjectKey: subjectFilterKey((subj as { name: string } | null)?.name),
         todayIso: schoolNow.toISOString().slice(0, 10),
       });
       groupContext = groupPerformanceHomeworkHint(perf);

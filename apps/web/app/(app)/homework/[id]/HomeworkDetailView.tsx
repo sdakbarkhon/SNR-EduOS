@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, FileText, Link as LinkIcon, Maximize2, Minimize2, Paperclip, Play, Send, Video, X } from "lucide-react";
 import { resolveSubject,
   getDictionary,
-  getSubjectStyle,
   submitHomeworkWithFile,
   getHomeworkFileUrl,
   getHomeworkAttachmentUrl,

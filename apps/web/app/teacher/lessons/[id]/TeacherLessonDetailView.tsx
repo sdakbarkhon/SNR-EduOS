@@ -16,7 +16,7 @@ import {
   deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
   linkLessonMaterialFromKnowledgeBase, addLessonMaterialVideo, addLessonMaterialVideoFile,
-  getSubjectStyle, getLessonExcuseRequests,
+  getLessonExcuseRequests,
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
   uploadPresentationFile, isPptxFile,

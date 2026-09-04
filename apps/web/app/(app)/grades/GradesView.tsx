@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Star, BookOpen, ClipboardCheck, Trophy, ChevronRight, CheckCircle2, ArrowUpDown } from "lucide-react";
 import { resolveSubject, getDictionary, gradeCategory, averageOf, countsTowardAverage } from "@snr/core";
 import type { Dictionary, Locale, StudentGradeItem } from "@snr/core";
@@ -78,7 +78,7 @@ function sortGrades(items: StudentGradeItem[], sort: SortValue): StudentGradeIte
     case "date_asc": arr.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")); break;
     case "grade_desc": arr.sort((a, b) => (b.grade5 ?? -1) - (a.grade5 ?? -1)); break;
     case "grade_asc": arr.sort((a, b) => (a.grade5 ?? -1) - (b.grade5 ?? -1)); break;
-    case "subject": arr.sort((a, b) => resolveSubject({ slug: a.subject }).label.localeCompare(resolveSubject({ slug: b.subject }).label)); break;
+    case "subject": arr.sort((a, b) => a.subject.localeCompare(b.subject)); break;
     default: arr.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")); break;
   }
   return arr;
@@ -155,6 +155,23 @@ export function GradesView({ grades, error = false }: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [sortValue, setSortValue] = useState<SortValue>("date_desc");
+
+  /**
+   * ВИД ПРЕДМЕТА ПО ЕГО НАЗВАНИЮ. 06.09.2026.
+   *
+   * Словарь названий снесён, и красить плитку по слагу больше нечем. Значок и
+   * цвет приходят вместе со строкой — из справочника школы (subjects.icon /
+   * subjects.color), — и здесь просто складываются в карту «название -> вид»,
+   * чтобы её можно было отдать резолверу там, где на руках одно название.
+   */
+  const видПредмета = useMemo(() => {
+    const карта = new Map<string, { name: string; icon: string | null; color: string | null }>();
+    for (const r of grades) {
+      if (!r.subject || карта.has(r.subject)) continue;
+      карта.set(r.subject, { name: r.subject, icon: r.subjectIcon ?? null, color: r.subjectColor ?? null });
+    }
+    return карта;
+  }, [grades]);
   const [selected, setSelected] = useState<StudentGradeItem | null>(null);
 
   if (error) {
@@ -182,6 +199,7 @@ export function GradesView({ grades, error = false }: Props) {
       </div>
     );
   }
+
 
   const subjects = Array.from(new Set(grades.map((g) => g.subject)));
   const availableKinds = Array.from(new Set(grades.map((g) => g.kind)));
@@ -301,7 +319,7 @@ export function GradesView({ grades, error = false }: Props) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[18px] font-black leading-tight text-slate-900">
-              {bestSubject ? resolveSubject({ slug: bestSubject.subject }).label : t.noSubjectYet}
+              {bestSubject ? resolveSubject({ catalog: видПредмета.get(bestSubject.subject), slug: bestSubject.subject }).label : t.noSubjectYet}
             </p>
             <p className="mt-1 text-[13px] font-bold text-slate-500">{t.bestSubjectLabel}</p>
           </div>
@@ -342,8 +360,8 @@ export function GradesView({ grades, error = false }: Props) {
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button onClick={() => setSubjectFilter("all")} className={pillClass(subjectFilter === "all")}>{t.allSubjects}</button>
             {subjects.map((s) => {
-              const cfg = resolveSubject({ slug: s });
-              const { Icon: SubjIcon } = resolveSubjectIcon(s);
+              const cfg = resolveSubject({ catalog: видПредмета.get(s), slug: s });
+              const { Icon: SubjIcon } = resolveSubjectIcon(s, видПредмета.get(s));
               return (
                 <button key={s} onClick={() => setSubjectFilter(s)} className={pillClass(subjectFilter === s)}>
                   <SubjIcon className="h-3.5 w-3.5" />
@@ -386,13 +404,13 @@ export function GradesView({ grades, error = false }: Props) {
                 <tbody>
                   {sorted.map((g) => (
                     <tr key={g.id} onClick={() => setSelected(g)} className="cursor-pointer border-b border-slate-50 transition-colors last:border-0 hover:bg-violet-50/40">
-                      <td className="w-[56px] px-3 py-3"><SubjectIcon subject={g.subject} size={44} /></td>
+                      <td className="w-[56px] px-3 py-3"><SubjectIcon subject={g.subject} catalog={видПредмета.get(g.subject)} size={44} /></td>
                       <td className="min-w-0 px-2 py-3">
                         <p className="truncate text-[14.5px] font-extrabold text-slate-900">
                           {g.kind === "lesson" ? `${d.lesson.kindLesson}: ${g.title}` : g.title}
                         </p>
                         <p className="mt-0.5 truncate text-[12.5px] font-semibold text-slate-400">
-                          {resolveSubject({ slug: g.subject }).label}
+                          {g.subject}
                           {/* Результат отдельно от оценки. «2» за квиз — это
                               два верных ответа из четырёх, а не двойка; без
                               этого числа оценка выглядит хуже, чем есть.
@@ -447,11 +465,11 @@ export function GradesView({ grades, error = false }: Props) {
               <h3 className="text-[17px] font-extrabold text-slate-900">{t.avgBySubjectTitle}</h3>
               <div className="mt-4 flex flex-col gap-4">
                 {subjectAverages.map(({ subject, avg }) => {
-                  const cfg = resolveSubject({ slug: subject });
+                  const cfg = resolveSubject({ catalog: видПредмета.get(subject), slug: subject });
                   return (
                     <div key={subject}>
                       <div className="mb-2 flex items-center gap-2.5">
-                        <SubjectIcon subject={subject} size={30} />
+                        <SubjectIcon subject={subject} catalog={видПредмета.get(subject)} size={30} />
                         <span className="flex-1 truncate text-[13.5px] font-bold text-slate-700">{cfg.label}</span>
                         <span className="text-[14px] font-black text-slate-900">{avg.toFixed(1)}</span>
                       </div>

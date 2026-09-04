@@ -9,7 +9,6 @@ import {
   getMySubmissions,
   getHomework,
   getTeachers,
-  getSubjectStyle,
   lessonStatus,
   lessonsOnDay,
   type Group,
@@ -17,6 +16,7 @@ import {
   type HomeworkSubmission,
   type Lesson,
 } from "@snr/core";
+import { getSubjectStyle } from "../../lib/subject-style";
 import { colors } from "@snr/ui-tokens";
 import { EmptyState, LessonRow, Screen, SegmentedTabs, SubjectIcon } from "../../components";
 import { getSupabase } from "../../lib/supabase";

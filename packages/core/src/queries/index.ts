@@ -13,7 +13,7 @@ import { getChildCountedGrades } from "./parent";
 import { averageOf, testGrade5, type GradeSource } from "../utils/gradeAverage";
 import { tashkentDayKey, tashkentDayBoundsUtc, tashkentMonthBoundsUtc } from "../utils/date";
 import { DEFAULT_LESSON_DURATION_MINUTES, isValidLessonDuration } from "../utils/lessonDuration";
-import { getSubjectKeyByLabel, subjectFilterKey } from "../config/subjects";
+import { subjectFilterKey } from "../config/subjects";
 import { mySchoolStoragePath } from "../storage/path";
 import { getSubjects } from "./subjects";
 
@@ -86,7 +86,10 @@ export const getAttendanceWithLesson = (
   db
     .from("attendance")
     .select(
-      "id, student_id, lesson_id, status, recorded_at, lesson:lessons!inner(starts_at, ends_at, group_id, topic, group:groups!inner(id, subject))",
+      // 06.09.2026 — предмет УРОКА, а не колонка группы: та устарела (256) и у
+      // всех трёх демо-классов одинакова, из-за чего посещаемость по предметам
+      // складывалась в одну кучу под словом «programming».
+      "id, student_id, lesson_id, status, recorded_at, lesson:lessons!inner(starts_at, ends_at, group_id, topic, subject:subjects(name, icon, color), group:groups!inner(id, subject))",
     )
     .order("recorded_at", { ascending: true })
     .then(unwrap)
@@ -112,6 +115,8 @@ export const getStudentAttendance = async (
     lesson_title: string;
     lesson_topic: string;
     subject: string;
+    subjectIcon: string | null;
+    subjectColor: string | null;
     lesson_date: string;
     status: AttendanceStatus;
     marked_at: string | null;
@@ -124,7 +129,7 @@ export const getStudentAttendance = async (
       // 26.08.2026: предмет берётся из lessons.subject_id, а не из
       // groups.subject — там у всех групп заглушка 'programming', и карточки
       // посещаемости подписывались «Программирование» подряд.
-      "id, lesson_id, status, marked_at, lesson:lessons!inner(topic, starts_at, subject:subjects(name), group:groups!inner(name))",
+      "id, lesson_id, status, marked_at, lesson:lessons!inner(topic, starts_at, subject:subjects(name, icon, color), group:groups!inner(name))",
     )
     .order("marked_at", { ascending: false });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -136,7 +141,7 @@ export const getStudentAttendance = async (
     lesson_id: string;
     status: AttendanceStatus;
     marked_at: string | null;
-    lesson: { topic: string | null; starts_at: string; subject: { name: string } | null; group: { name: string } };
+    lesson: { topic: string | null; starts_at: string; subject: { name: string; icon: string | null; color: string | null } | null; group: { name: string } };
   }>);
 
   if (filters?.subject) rows = rows.filter((r) => subjectFilterKey(r.lesson.subject?.name) === filters.subject);
@@ -157,6 +162,10 @@ export const getStudentAttendance = async (
       lesson_title: r.lesson.group.name,
       lesson_topic: r.lesson.topic ?? "",
       subject: subjectFilterKey(r.lesson.subject?.name),
+      // Вид предмета из справочника — тем же заходом, что и у оценок: словаря
+      // названий больше нет, красить плитку по слагу нечем.
+      subjectIcon: r.lesson.subject?.icon ?? null,
+      subjectColor: r.lesson.subject?.color ?? null,
       lesson_date: r.lesson.starts_at,
       status: r.status,
       marked_at: r.marked_at,
@@ -1132,7 +1141,7 @@ export const getMyTeacher = async (db: Db) => {
  * миграции 107) — учитель английского видел три карточки «Программирование».
  * Настоящий предмет лежит в subjects: строка на пару (группа, учитель), с
  * названием, иконкой и цветом. Отсюда же берут предмет оценки и уроки
- * (subject:subjects(name) в getStudentGrades и getTeacherLessonsForGroup) —
+ * (subject:subjects(name, icon, color) в getStudentGrades и getTeacherLessonsForGroup) —
  * заводить ещё один способ его узнать было бы четвёртым.
  *
  * У куратора (teachers.subject_slug = NULL) предметов в группе может быть
@@ -1316,7 +1325,18 @@ export type StudentGradeItem = {
   kind: "file" | "test" | "programming" | "project" | "quiz" | "kahoot" | "external" | "lesson" | "code_completion";
   sourceTable: GradeSourceTable;
   title: string;
+  /** Ключ и подпись предмета — само название (subjectFilterKey). */
   subject: string;
+  /**
+   * ВИД ПРЕДМЕТА ИЗ СПРАВОЧНИКА. 06.09.2026.
+   *
+   * До сноса словаря названий экран оценок красил плитки по слагу из кода:
+   * «math» — оранжевым калькулятором. Словаря нет, и вид приходит оттуда же,
+   * откуда название, — из строки `subjects` (её icon/color заводит админ).
+   * Пусто — экран рисует запасной вид, как и для предмета вне справочника.
+   */
+  subjectIcon: string | null;
+  subjectColor: string | null;
   groupName: string;
   date: string; // submitted_at / graded_at (дата работы)
   grade5: number | null; // нормировано к /5 для средних
@@ -1433,7 +1453,7 @@ export function gradeCategory(sourceTable: GradeSourceTable): "assignment" | "le
 // комментарий миграции 107) — использование group.subject подписывало ВСЕ
 // оценки одним предметом независимо от реального. groups.name (номер класса,
 // напр. "10-А") остаётся годным и используется как есть.
-type HwJoin = { title: string; content_type: string; group: { name: string } | null; subject: { name: string } | null };
+type HwJoin = { title: string; content_type: string; group: { name: string } | null; subject: { name: string; icon: string | null; color: string | null } | null };
 
 /** Все оценённые работы текущего ученика (RLS отдаёт только свои).
  *  studentId — опционально: parent-контекст сужает до ОДНОГО выбранного
@@ -1482,9 +1502,9 @@ export const getStudentGrades = async (
   // NB: не выбираем graded_at — экран ученика не должен зависеть от миграции 19
   // на hosted. Дата работы = submitted_at (для seed практически совпадает).
   const fileSel =
-    "id, student_id, grade, teacher_comment, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(name), subject:subjects(name))";
+    "id, student_id, grade, teacher_comment, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(name), subject:subjects(name, icon, color))";
   const testSel =
-    "id, student_id, score, max_score, grade, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(name), subject:subjects(name))";
+    "id, student_id, score, max_score, grade, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(name), subject:subjects(name, icon, color))";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fileQuery: any = db.from("homework_submissions").select(fileSel).not("grade", "is", null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1520,6 +1540,8 @@ export const getStudentGrades = async (
       // исчезал вместе со всеми своими оценками. subjectFilterKey пропускает
       // его под собственным именем, конфиг при этом не расширяется.
       subject: subjectFilterKey(r.homework?.subject?.name),
+      subjectIcon: r.homework?.subject?.icon ?? null,
+      subjectColor: r.homework?.subject?.color ?? null,
       groupName: r.homework?.group?.name ?? "",
       date: r.submitted_at,
       grade5: r.grade,
@@ -1541,6 +1563,8 @@ export const getStudentGrades = async (
       // исчезал вместе со всеми своими оценками. subjectFilterKey пропускает
       // его под собственным именем, конфиг при этом не расширяется.
       subject: subjectFilterKey(r.homework?.subject?.name),
+      subjectIcon: r.homework?.subject?.icon ?? null,
+      subjectColor: r.homework?.subject?.color ?? null,
       groupName: r.homework?.group?.name ?? "",
       date: r.submitted_at,
       grade5: hasGrade ? r.grade : (max > 0 ? (r.score / max) * 5 : null),
@@ -1578,6 +1602,8 @@ export const getStudentGrades = async (
         // 26.08.2026: у projects нет subject_id, а текстовая колонка subject
         // хранит слаг группы — ту же заглушку. Предмета у проекта нет.
         subject: "",
+        subjectIcon: null,
+        subjectColor: null,
         groupName: r.project?.group?.name ?? "",
         date: r.submitted_at ?? r.graded_at ?? "",
         grade5: r.grade,
@@ -1600,7 +1626,7 @@ export const getStudentGrades = async (
     // one relationship was found" — confirmed live in production logs.
     const stageSel =
       "id, student_id, grade, teacher_comment, completed_at, graded_at, submission_data, " +
-      "stage:lesson_stages!inner(title, content_type, lesson:lessons!lesson_id(subject_id, group:groups!inner(name), subject:subjects(name)))";
+      "stage:lesson_stages!inner(title, content_type, lesson:lessons!lesson_id(subject_id, group:groups!inner(name), subject:subjects(name, icon, color)))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let stageQuery: any = (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
     if (studentId) stageQuery = stageQuery.eq("student_id", studentId);
@@ -1611,7 +1637,7 @@ export const getStudentGrades = async (
       id: string; student_id: string; grade: number; teacher_comment: string | null;
       completed_at: string | null; graded_at: string | null;
       submission_data: { kind?: string } | null;
-      stage: { title: string; content_type: string; lesson: { group: { name: string } | null; subject: { name: string } | null } | null } | null;
+      stage: { title: string; content_type: string; lesson: { group: { name: string } | null; subject: { name: string; icon: string | null; color: string | null } | null } | null } | null;
     }>) {
       const ct = r.stage?.content_type ?? "";
       // Аудит Пачки A: code_completion падал в "external" (общий фолбэк) —
@@ -1640,7 +1666,9 @@ export const getStudentGrades = async (
         kind,
         sourceTable: "lesson_stage_progress",
         title: r.stage?.title ?? "Задание урока",
-        subject: getSubjectKeyByLabel(r.stage?.lesson?.subject?.name) ?? "",
+        subject: subjectFilterKey(r.stage?.lesson?.subject?.name),
+        subjectIcon: r.stage?.lesson?.subject?.icon ?? null,
+        subjectColor: r.stage?.lesson?.subject?.color ?? null,
         groupName: r.stage?.lesson?.group?.name ?? "",
         date: r.graded_at ?? r.completed_at ?? "",
         grade5: r.grade,
@@ -1654,7 +1682,7 @@ export const getStudentGrades = async (
   // Lesson grades (migration 40)
   {
     const lgSel =
-      "id, student_id, grade, comment, graded_at, lesson:lessons!inner(title, subject_id, group:groups!inner(name), subject:subjects(name))";
+      "id, student_id, grade, comment, graded_at, lesson:lessons!inner(title, subject_id, group:groups!inner(name), subject:subjects(name, icon, color))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let lgQuery: any = (db as any).from("lesson_grades").select(lgSel);
     if (studentId) lgQuery = lgQuery.eq("student_id", studentId);
@@ -1663,13 +1691,15 @@ export const getStudentGrades = async (
     const lgData = unwrap(lgRes);
     for (const r of lgData as unknown as Array<{
       id: string; student_id: string; grade: number; comment: string | null; graded_at: string;
-      lesson: { title: string | null; group: { name: string } | null; subject: { name: string } | null } | null;
+      lesson: { title: string | null; group: { name: string } | null; subject: { name: string; icon: string | null; color: string | null } | null } | null;
     }>) {
       items.push({
         id: r.id, studentId: r.student_id, kind: "lesson",
         sourceTable: "lesson_grades",
         title: r.lesson?.title ?? "Урок",
-        subject: getSubjectKeyByLabel(r.lesson?.subject?.name) ?? "",
+        subject: subjectFilterKey(r.lesson?.subject?.name),
+        subjectIcon: r.lesson?.subject?.icon ?? null,
+        subjectColor: r.lesson?.subject?.color ?? null,
         groupName: r.lesson?.group?.name ?? "",
         date: r.graded_at,
         grade5: r.grade,
@@ -2175,7 +2205,7 @@ export const getTeacherHomeworkSubmissions = (db: Db, limit = 1000) =>
       "ai_review_status, grade, " +
       "student:students!inner(id, full_name, avatar_url), " +
       "homework:homework!inner(id, title, content_type, group_id, " +
-      "subject:subjects(name), group:groups!inner(name, subject))",
+      "subject:subjects(name, icon, color), group:groups!inner(name, subject))",
     )
     .order("submitted_at", { ascending: false })
     .limit(limit)
@@ -3026,13 +3056,13 @@ export const getTeacherLessonsForGroup = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (db as any)
     .from("lessons")
-    .select("id, starts_at, topic, title, lesson_no, subject_id, subject:subjects(name)")
+    .select("id, starts_at, topic, title, lesson_no, subject_id, subject:subjects(name, icon, color)")
     .eq("group_id", groupId)
     .order("starts_at", { ascending: false });
   if (error) throw error;
   const filter = await getTeacherSubjectFilter(db);
   const rows = filterBySubject(
-    (data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subject_id: string | null; subject: { name: string } | null }>,
+    (data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subject_id: string | null; subject: { name: string; icon: string | null; color: string | null } | null }>,
     filter,
   );
   return rows.map((r) => ({ id: r.id, starts_at: r.starts_at, topic: r.topic, title: r.title, lesson_no: r.lesson_no, subjectId: r.subject_id, subjectName: r.subject?.name ?? null }));

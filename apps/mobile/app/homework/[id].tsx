@@ -15,11 +15,11 @@ import {
   defaultLocale,
   getDictionary,
   getHomeworkById,
-  getSubjectStyle,
   submitHomework,
   uploadHomeworkFile,
   type HomeworkWithSubmission,
 } from "@snr/core";
+import { getSubjectStyle } from "../../lib/subject-style";
 import { colors } from "@snr/ui-tokens";
 import { SubjectIcon } from "../../components";
 import { getSupabase } from "../../lib/supabase";

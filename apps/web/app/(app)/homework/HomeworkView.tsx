@@ -12,7 +12,6 @@ import {
 import { resolveSubject,
   getDictionary,
   getHomeworkWithSubmissions,
-  getSubjectStyle,
   homeworkCategory,
   homeworkCounts,
   deadlineUrgency,

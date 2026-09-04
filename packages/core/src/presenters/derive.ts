@@ -35,6 +35,10 @@ export const ATTENDANCE_LOW_THRESHOLD = 75; // TODO: вынести в наст�
 
 export type SubjectAttendanceStat = {
   subject: string;
+  /** Вид предмета из справочника школы — для плитки. Пусто, если урок без
+   *  назначения: тогда экран рисует запасной значок и цвет. */
+  icon: string | null;
+  color: string | null;
   pct: number;
   attended: number;
   total: number;
@@ -71,17 +75,25 @@ export function attendanceCalcAll(rows: AttendanceWithLesson[]): AttendanceStats
   const daysWithoutAbsence = [...byDay.values()].filter((d) => !d.hasAbsent).length;
 
   // by subject
-  const subjectMap = new Map<string, { attended: number; total: number }>();
+  // 06.09.2026 — группируем по ПРЕДМЕТУ УРОКА. Здесь стояла колонка группы
+  // (`lesson.group.subject`): она устарела вместе с моделью «группа = один
+  // курс», у трёх демо-классов в ней одно и то же слово, и вся посещаемость
+  // ученика складывалась в один предмет. Колонка оставлена запасным путём для
+  // строк, у которых предмета урока нет вовсе.
+  const subjectMap = new Map<string, { attended: number; total: number; icon: string | null; color: string | null }>();
   for (const r of rows) {
-    const subj = r.lesson.group.subject;
-    const cur = subjectMap.get(subj) ?? { attended: 0, total: 0 };
+    const subj = (r.lesson.subject?.name ?? "").trim() || r.lesson.group.subject;
+    const cur = subjectMap.get(subj)
+      ?? { attended: 0, total: 0, icon: r.lesson.subject?.icon ?? null, color: r.lesson.subject?.color ?? null };
     cur.total += 1;
     if (r.status === "present") cur.attended += 1;
     subjectMap.set(subj, cur);
   }
   const bySubject: SubjectAttendanceStat[] = [...subjectMap.entries()]
-    .map(([subject, { attended, total }]) => ({
+    .map(([subject, { attended, total, icon, color }]) => ({
       subject,
+      icon,
+      color,
       pct: Math.round((attended / total) * 100),
       attended,
       total,

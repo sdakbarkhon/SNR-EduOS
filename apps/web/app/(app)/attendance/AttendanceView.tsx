@@ -5,11 +5,9 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { resolveSubject,
   getDictionary,
   getStudentAttendance,
-  getSubjectStyle,
   tashkentDayKey,
   tashkentParts,
   type AttendanceStatus,
-  subjectLabelOf,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -23,6 +21,8 @@ type AttendanceRecord = {
   lesson_title: string;
   lesson_topic: string;
   subject: string;
+  subjectIcon: string | null;
+  subjectColor: string | null;
   lesson_date: string;
   status: AttendanceStatus;
   marked_at: string | null;
@@ -163,6 +163,23 @@ export function AttendanceView({
 
   const onSubjectChange = (s: string) => { setSubject(s); reload(s, month); };
   const onMonthChange = (m: string) => { setMonth(m); reload(subject, m); };
+
+  /**
+   * ВИД ПРЕДМЕТА ПО ЕГО НАЗВАНИЮ. 06.09.2026.
+   *
+   * Словарь названий снесён, и красить плитку по слагу больше нечем. Значок и
+   * цвет приходят вместе со строкой — из справочника школы (subjects.icon /
+   * subjects.color), — и здесь просто складываются в карту «название -> вид»,
+   * чтобы её можно было отдать резолверу там, где на руках одно название.
+   */
+  const видПредмета = useMemo(() => {
+    const карта = new Map<string, { name: string; icon: string | null; color: string | null }>();
+    for (const r of initialRecords) {
+      if (!r.subject || карта.has(r.subject)) continue;
+      карта.set(r.subject, { name: r.subject, icon: r.subjectIcon ?? null, color: r.subjectColor ?? null });
+    }
+    return карта;
+  }, [initialRecords]);
 
   const subjectOptions = useMemo(() => {
     const set = new Set(initialRecords.map((r) => r.subject));
@@ -376,7 +393,7 @@ export function AttendanceView({
               </div>
               <div className="divide-y divide-slate-100">
                 {selectedDayRecords.map((row) => {
-                  const style = resolveSubject({ slug: row.subject });
+                  const style = resolveSubject({ catalog: видПредмета.get(row.subject), slug: row.subject });
                   const timeLbl = new Date(row.lesson_date).toLocaleTimeString("ru-RU", {
                     hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent",
                   });
@@ -384,7 +401,7 @@ export function AttendanceView({
                   const sLbl = statusLabel(row.status, d);
                   return (
                     <div key={row.id} className="flex items-center gap-3 px-5 py-3">
-                      <SubjectIcon subject={row.subject} size={34} />
+                      <SubjectIcon subject={row.subject} catalog={видПредмета.get(row.subject)} size={34} />
                       <div className="min-w-0 flex-1">
                         <div className="text-[13px] font-semibold text-slate-800">
                           {row.lesson_topic || style.label}
@@ -419,7 +436,7 @@ export function AttendanceView({
           ) : (
             <div className="divide-y divide-slate-100 max-h-[440px] overflow-y-auto">
               {sortedRecords.map((row) => {
-                const style = resolveSubject({ slug: row.subject });
+                const style = resolveSubject({ catalog: видПредмета.get(row.subject), slug: row.subject });
                 const dateLbl = new Date(row.lesson_date).toLocaleDateString("ru-RU", {
                   day: "numeric", month: "short", timeZone: "Asia/Tashkent",
                 });
@@ -427,7 +444,7 @@ export function AttendanceView({
                 const sLbl = statusLabel(row.status, d);
                 return (
                   <div key={row.id} className="flex items-center gap-3 px-5 py-3">
-                    <SubjectIcon subject={row.subject} size={36} />
+                    <SubjectIcon subject={row.subject} catalog={видПредмета.get(row.subject)} size={36} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] font-semibold text-slate-800">
                         {row.lesson_topic || style.label}

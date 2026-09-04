@@ -1,4 +1,3 @@
-import { resolveSubject } from "@snr/core";
 import { schoolViewContext } from "@/lib/school-view";
 import { TableClient } from "../TableClient";
 
@@ -25,9 +24,11 @@ export default async function SchoolTeachersPage({ params }: { params: Promise<{
     id: t.id,
     full_name: t.full_name,
     username: t.username,
-    // 26.08.2026: в колонке «Основной предмет» стоял сырой слаг — «english»,
-    // «math», латиницей. У куратора (subject_slug пуст) была пустая ячейка.
-    subject: resolveSubject({ slug: t.subject_slug }).label,
+    // 06.09.2026: в колонке «Основной предмет» был слаг с карточки, развёрнутый
+    // словарём. Словарь снесён, а карточка и без него врала у многопредметного:
+    // она заполняется первым назначением и больше не меняется. Берём первое
+    // из настоящих назначений — они уже посчитаны строкой ниже.
+    subject: [...(поУчителю.get(t.id) ?? [])].sort((a, b) => a.localeCompare(b))[0] ?? "—",
     subjects: [...(поУчителю.get(t.id) ?? [])].join(", "),
   }));
 

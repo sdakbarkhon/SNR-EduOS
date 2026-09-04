@@ -5,7 +5,7 @@ import {
   Search, FileText, BookOpen, Link as LinkIcon,
   Video, FileImage, File, FolderOpen, X, CalendarDays, ChevronDown,
 } from "lucide-react";
-import { resolveSubject, getDictionary, type Locale, type MaterialWithGroup, type LessonSlide, subjectLabelOf, subjectDisplay } from "@snr/core";
+import { resolveSubject, getDictionary, type Locale, type MaterialWithGroup, type LessonSlide, subjectDisplay } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { buildFilterOptions, matchesFilters, groupByDay, materialSubjectLabel } from "@/lib/material-filters";
 import {

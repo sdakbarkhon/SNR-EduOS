@@ -1,4 +1,3 @@
-import { resolveSubject } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { Avatar } from "./Avatar";
@@ -19,12 +18,23 @@ export async function TeacherHeaderInfo() {
     const teacher = await getMyTeacher(supabase);
     teacherName = teacher.full_name ?? "";
     avatarUrl = teacher.avatar_url ?? null;
-    // Подпись — предмет из карточки. Пусто, если предмет ещё не назначен:
-    // 30.08.2026 здесь стояло слово «Куратор», роль убрана из продукта, и
-    // называть так каждого учителя с незаполненной карточкой — неправда.
-    // Брать «Программирование» из legacy groups.subject тоже нельзя: оно
-    // одинаковое во всех группах.
-    teacherSubtitle = teacher.subject_slug ? resolveSubject({ slug: teacher.subject_slug }).label : "";
+    // ПОДПИСЬ — ПРЕДМЕТЫ ИЗ НАЗНАЧЕНИЙ. 06.09.2026.
+    //
+    // Здесь стоял слаг с карточки (`teachers.subject_slug`), развёрнутый
+    // словарём в русское слово. Словарь снесён, и слаг развернуть нечем — но
+    // и не нужно: карточка отвечает на вопрос «что человек ведёт» только у
+    // однопредметного, а назначения отвечают всегда.
+    //
+    // Двух хватает: это подпись под именем в шапке, а не список предметов.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: назначения } = await (supabase as any)
+      .from("subjects").select("name")
+      .eq("teacher_id", teacher.id).eq("is_active", true).eq("is_stub", false);
+    const имена = [...new Set(
+      ((назначения ?? []) as Array<{ name: string | null }>)
+        .map((r) => (r.name ?? "").trim()).filter(Boolean),
+    )].sort((a, b) => a.localeCompare(b));
+    teacherSubtitle = имена.slice(0, 2).join(", ") + (имена.length > 2 ? "…" : "");
   } catch (err) {
     console.error("[TeacherHeaderInfo] getMyTeacher failed:", err);
   }

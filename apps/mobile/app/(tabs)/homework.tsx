@@ -7,12 +7,12 @@ import {
   defaultLocale,
   getDictionary,
   getHomeworkWithSubmissions,
-  getSubjectStyle,
   homeworkCategory,
   homeworkCounts,
   type HomeworkTab,
   type HomeworkWithSubmission,
 } from "@snr/core";
+import { getSubjectStyle } from "../../lib/subject-style";
 import { colors } from "@snr/ui-tokens";
 import { Screen, SegmentedTabs, SubjectIcon, type TabItem } from "../../components";
 import { getSupabase } from "../../lib/supabase";

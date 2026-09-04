@@ -8,8 +8,7 @@ import {
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Users, Hash,
   Maximize2, Minimize2, Bot, RefreshCw, LogOut, Play, CheckCircle2, Loader2,
 } from "lucide-react";
-import { resolveSubject,
-  getSubjectStyle, formatTime, getDictionary,
+import { resolveSubject, formatTime, getDictionary,
   markTheoryStudied, submitStageTask, endLesson,
   getMaterialDownloadUrl, setActiveStage,
 } from "@snr/core";

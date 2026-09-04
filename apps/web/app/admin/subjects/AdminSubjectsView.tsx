@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Library, Plus, Pencil, X, Check, Loader2, Eye, EyeOff, Trash2 } from "lucide-react";
-import { getDictionary, SUBJECT_DEFAULTS, subjects as SUBJECT_CONFIG } from "@snr/core";
+import { getDictionary, SUBJECT_DEFAULTS } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
@@ -48,12 +48,19 @@ function SubjectGlyph({ name, size = 18, className }: { name: string; size?: num
   return <Icon size={size} className={className} />;
 }
 
-/** Десять названий, которые система узнаёт: только для них у предмета свой
- *  цвет и значок. Список берём из того же конфига, что рисует предметы на
- *  экранах, — второго списка заводить нельзя, разойдётся. */
-const KNOWN_SUBJECT_NAMES = Object.values(SUBJECT_CONFIG).map((s) => s.label);
-/** Служебное значение пункта «своё название» — им не может быть настоящее имя. */
-const CUSTOM_NAME = "__custom__";
+/**
+ * 06.09.2026 — СПИСКА «ИЗВЕСТНЫХ НАЗВАНИЙ» ЗДЕСЬ БОЛЬШЕ НЕТ.
+ *
+ * Он приходил из словаря предметов в коде, и смысл у него был такой: система
+ * узнаёт вот эти названия, у них будет свой цвет и значок, а «своё» название
+ * получит серую заглушку и предупреждение. Словарь снесён — узнавать нечем и
+ * незачем: цвет и значок админ выбирает руками прямо здесь, у любого
+ * названия. Предупреждать больше не о чем.
+ *
+ * Подсказка по названию осталась (SUBJECT_DEFAULTS): набрал «Математика» —
+ * форма предложит калькулятор и оранжевый. Это подсказка, а не правило: любой
+ * выбор перебивает её.
+ */
 /** Служебное значение пункта «завести кафедру тут же». */
 const NEW_DEPARTMENT = "__new__";
 
@@ -333,36 +340,19 @@ export function AdminSubjectsView({
               </div>
 
               <div className="space-y-4 p-5">
-                {/* Раньше название вводилось свободным текстом, и опечатка вроде
-                    «Матем.» молча лишала предмет своего цвета и значка: система
-                    узнаёт ровно десять названий. Теперь их предлагаем списком, а
-                    своё название остаётся возможным — но с предупреждением. */}
+                {/* Название — свободный текст. Предмет придумывает школа, и
+                    список «известных» ей больше не предлагается: узнавать было
+                    нечем, а цвет со значком она выбирает ниже сама. */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsName}</label>
-                  <select
-                    value={KNOWN_SUBJECT_NAMES.includes(formName) ? formName : CUSTOM_NAME}
-                    onChange={(e) => onNameChange(e.target.value === CUSTOM_NAME ? "" : e.target.value)}
+                  <input
+                    type="text"
+                    value={formName}
+                    onChange={(e) => onNameChange(e.target.value)}
+                    placeholder="Хореография"
                     className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  >
-                    <option value="" disabled>{d.subjectsPickKnown}</option>
-                    {KNOWN_SUBJECT_NAMES.map((name) => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                    <option value={CUSTOM_NAME}>{d.subjectsOwnName}</option>
-                  </select>
-
-                  {!KNOWN_SUBJECT_NAMES.includes(formName) && (
-                    <>
-                      <input
-                        type="text"
-                        value={formName}
-                        onChange={(e) => onNameChange(e.target.value)}
-                        placeholder="Хореография"
-                        className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      />
-                      <p className="mt-1 text-xs text-amber-600">{d.subjectsOwnNameWarning}</p>
-                    </>
-                  )}
+                    autoFocus
+                  />
                 </div>
 
                 {/* Кафедра. Только при создании: перевод существующего

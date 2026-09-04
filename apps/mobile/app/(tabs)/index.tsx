@@ -14,11 +14,11 @@ import {
   getMyGroups,
   getMyStudent,
   getMySubmissions,
-  getSubjectStyle,
   nextLesson,
   type CourseMaterial,
   type Student,
 } from "@snr/core";
+import { getSubjectStyle } from "../../lib/subject-style";
 import { colors, factBanner, sidebar } from "@snr/ui-tokens";
 import {
   KpiCard,

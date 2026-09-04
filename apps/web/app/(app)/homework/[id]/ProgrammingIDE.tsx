@@ -6,7 +6,7 @@ import {
   ArrowLeft, Play, Send, Download, FileText, Loader2, Code2,
 } from "lucide-react";
 import { resolveSubject,
-  getDictionary, getSubjectStyle, submitProgrammingHomework, getHomeworkTestsUrl,
+  getDictionary, submitProgrammingHomework, getHomeworkTestsUrl,
   homeworkSubmissionStatusKind,
   type HomeworkWithSubmission, type Locale,
 } from "@snr/core";

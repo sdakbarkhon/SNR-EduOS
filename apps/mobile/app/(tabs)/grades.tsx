@@ -4,9 +4,9 @@ import {
   defaultLocale,
   getDictionary,
   getStudentGrades,
-  getSubjectStyle,
   type StudentGradeItem,
 } from "@snr/core";
+import { getSubjectStyle } from "../../lib/subject-style";
 import { colors } from "@snr/ui-tokens";
 import { Screen } from "../../components";
 import { getSupabase } from "../../lib/supabase";

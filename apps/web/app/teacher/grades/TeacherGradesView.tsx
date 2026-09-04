@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  getDictionary, getSubjectConfig, getTeacherGradeMatrix, getTestQuestions,
+  getDictionary, getTeacherGradeMatrix, getTestQuestions,
   getLessonGradesForGroup, type LessonGradeRow,
   averageOf, testGrade5, formatDate, tashkentDayKey,
 } from "@snr/core";

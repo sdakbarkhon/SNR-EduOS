@@ -32,7 +32,6 @@ import {
   linkLessonMaterialFromKnowledgeBase,
   replaceQuizQuestions,
 } from "../queries";
-import { getSubjectKeyByLabel } from "../config/subjects";
 
 /** Этап, каким его отдаёт `/api/ai/generate-stages`. */
 export type GeneratedStage = {
@@ -112,8 +111,16 @@ async function attachBooksFromKnowledgeBase(
   subjectName: string,
   schoolId?: string,
 ): Promise<number> {
-  const slug = getSubjectKeyByLabel(subjectName);
-  if (!slug) return 0;
+  // 06.09.2026 — книги ищутся по СПРАВОЧНИКУ, а не по слагу из словаря кода:
+  // словарь снесён, а у книги с миграции 254 есть ссылка на предмет школы.
+  // Предмета с таким названием в школе нет — прицеплять нечего.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dbCat = db as any;
+  let catQuery = dbCat.from("school_subjects").select("id").eq("name", subjectName);
+  if (schoolId) catQuery = catQuery.eq("school_id", schoolId);
+  const { data: catRow } = await catQuery.maybeSingle();
+  const catalogId = (catRow as { id: string } | null)?.id ?? null;
+  if (!catalogId) return 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
@@ -125,7 +132,7 @@ async function attachBooksFromKnowledgeBase(
   const { data: books } = await db2
     .from("books")
     .select("id, title, file_storage_path, file_size_bytes")
-    .eq("subject", slug)
+    .eq("catalog_id", catalogId)
     // Миграция 175 — в библиотеке есть книги-видеоссылки без файла. Сюда идёт
     // путь в хранилище, поэтому берём только книги-файлы: иначе к уроку молча
     // прицепился бы материал с пустым путём.

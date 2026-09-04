@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { FALLBACK_SUBJECT_COLOR } from "@/components/LessonSubjectIcon";
 import {
-  getDictionary, getSubjectStyle, startProject, toggleStageCompletion,
+  getDictionary, startProject, toggleStageCompletion,
   uploadProjectAttachment, deleteProjectAttachment, getProjectAttachmentUrl, submitProject,
   type Locale, type ProjectWithStages, type ProjectSubmission, type ProjectStageProgress, type ProjectAttachment,
 } from "@snr/core";

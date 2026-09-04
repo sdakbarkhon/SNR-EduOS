@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { resolveSubject,
   getDictionary,
-  getSubjectStyle,
   getOrCreateBundleSubmission,
   getHomeworkSubtaskSubmissions,
   saveHomeworkSubtaskProgress,

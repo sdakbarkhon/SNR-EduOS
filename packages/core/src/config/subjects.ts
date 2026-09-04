@@ -1,121 +1,57 @@
-import { colors } from "@snr/ui-tokens";
-
-export interface SubjectStyle {
-  label: string;
-  color: string;
-  icon: string;
-}
-
-export const subjects: Record<string, SubjectStyle> = {
-  robotics:    { label: "Робототехника",    color: "#2D5BFF", icon: "bot" },
-  informatics: { label: "Информатика",      color: "#7A4DFF", icon: "monitor" },
-  programming: { label: "Программирование", color: "#0EA5E9", icon: "code-2" },
-  math:        { label: "Математика",       color: "#F5A623", icon: "calculator" },
-  physics:     { label: "Физика",           color: "#39B6F5", icon: "atom" },
-  english:     { label: "Английский язык",  color: "#F0556B", icon: "languages" },
-  russian:     { label: "Русский язык",     color: "#DC2626", icon: "book-open" },
-  history:     { label: "История",          color: "#B5793A", icon: "scroll" },
-  biology:     { label: "Биология",         color: "#2DBE7E", icon: "leaf" },
-  chemistry:   { label: "Химия",            color: "#9B5DE5", icon: "flask-conical" },
-
-  /**
-   * 04.09.2026 — СЕМЬ НАЗВАНИЙ, КОТОРЫХ ЗДЕСЬ НЕ ХВАТАЛО.
-   *
-   * Этот словарь — не украшение: по нему `getSubjectKeyByLabel` выдаёт слаг
-   * при назначении учителя на предмет, а без слага у учителя нет кафедры и
-   * он не может загрузить материал в библиотеку. Названия, которых здесь
-   * нет, слага не получают — и трое учителей («Science» дважды и
-   * «Схемотехника») сидели без кафедры именно поэтому.
-   *
-   * Взяты все названия из справочника школ, которых не было: два уже
-   * работающих и пять, ждавших своей очереди.
-   *
-   * Сверка идёт ТОЧНОЙ строкой, поэтому подпись обязана совпадать с тем, что
-   * набрали в карточке предмета, — «Science» латиницей, «ИЗО» заглавными.
-   */
-  science:     { label: "Science",          color: "#14B8A6", icon: "microscope" },
-  circuitry:   { label: "Схемотехника",     color: "#64748B", icon: "circuit-board" },
-  nature:      { label: "Природоведение",   color: "#16A34A", icon: "tree-pine" },
-  art:         { label: "ИЗО",              color: "#EC4899", icon: "palette" },
-  music:       { label: "Музыка",           color: "#8B5CF6", icon: "music" },
-  geography:   { label: "География",        color: "#F97316", icon: "globe" },
-  social:      { label: "Обществознание",   color: "#71717A", icon: "users" },
-};
-
-export const defaultSubjectStyle: SubjectStyle = {
-  label: "Предмет",
-  color: colors.primary,
-  icon: "book-open",
-};
-
-export function getSubjectStyle(subject: string | null | undefined): SubjectStyle {
-  if (!subject) return defaultSubjectStyle;
-  return subjects[subject] ?? defaultSubjectStyle;
-}
-
-export function getSubjectConfig(subject: string | null | undefined): SubjectStyle {
-  return getSubjectStyle(subject);
-}
-
-// Обратный поиск: RU-название предмета урока (lessons.subject_id ->
-// subjects.name, напр. "Английский язык") -> canonical-ключ этого же
-// конфига (напр. "english") — тот же ключ, что books.subject. Один
-// источник правды (сам subjects выше), а не отдельный параллельный словарь.
-export function getSubjectKeyByLabel(label: string | null | undefined): string | null {
-  if (!label) return null;
-  for (const [key, cfg] of Object.entries(subjects)) {
-    if (cfg.label === label) return key;
-  }
-  return null;
-}
-
 /**
- * ПОДПИСЬ ПРЕДМЕТА, КОТОРАЯ НЕ ВРЁТ И НЕ ТЕРЯЕТ. 26.08.2026.
+ * ═══ СПИСКА НАЗВАНИЙ ПРЕДМЕТОВ ЗДЕСЬ БОЛЬШЕ НЕТ. 06.09.2026 ═════════════════
  *
- * Прочерк, а не «Предмет» и не пустое место. `getSubjectStyle` для неизвестного
- * ключа отдаёт defaultSubjectStyle с подписью «Предмет» — это годится для цвета
- * и иконки, но на месте названия читается как утверждение. Если предмета нет,
- * человек должен видеть прочерк и понимать, что здесь пусто.
+ * Он жил тут семнадцатью строками — «robotics: Робототехника», «math:
+ * Математика» — и отвечал сразу на два вопроса: как выглядит предмет и какой
+ * у него слаг. Оба ответа были не наши: предметы заводит школа.
  *
- * Колонки lessons.subject_id и homework.subject_id обе nullable. Сегодня пустых
- * нет ни одной (128 уроков и 59 заданий, все с предметом), но код обязан уметь
- * пустоту, иначе первая же строка без предмета подпишется чужим словом.
+ * Что за десять заходов встало на его место:
+ *
+ *   вид предмета     → resolveSubject (./subject-resolver) из справочника
+ *                      school_subjects: подпись, значок и цвет — школьные;
+ *   право на кафедру → таблица departments (миграция 255), а не слаг;
+ *   сервисы предмета → school_subjects.services (258), галочками;
+ *   предмет книги    → books.catalog_id (254);
+ *   предмет материала→ course_materials.catalog_id (257);
+ *   предмет группы   → назначения subjects, а не groups.subject (256).
+ *
+ * ЧТО ОН УСПЕЛ НАЛОМАТЬ, ПОКА ЖИЛ. Названия вне списка («Схемотехника»,
+ * «Science») не получали ни цвета, ни значка, ни кафедры, ни сервисов —
+ * молча, без единого следа. Трое учителей сидели без библиотеки, пока
+ * заказчик не пожаловался.
+ *
+ * ГДЕ ОН ОСТАЛСЯ. Ровно в одном месте: `apps/mobile/lib/subject-style.ts` —
+ * замороженная копия для ученического приложения, которое проверкой типов
+ * монорепо не покрыто и переписке пока не подлежит. Она никем больше не
+ * читается и уйдёт вместе с разморозкой.
+ *
+ * ═══ ЧТО ОСТАЛОСЬ В ЭТОМ ФАЙЛЕ ════════════════════════════════════════════
+ *
+ * Три функции, которым словарь не нужен вовсе: они работают с названием как
+ * с текстом.
  */
+
+/** Название предмета к показу. Пусто — прочерк, а не пустое место. */
 export function subjectDisplay(name: string | null | undefined): string {
   const clean = (name ?? "").trim();
   return clean || "—";
 }
 
 /**
- * Ключ предмета для группировки и фильтров.
+ * Ключ предмета для группировки и фильтров — само название.
  *
- * ЗАЧЕМ. `getSubjectKeyByLabel` знает только канонические предметы и на всё
- * остальное отдаёт null. Вызывающие писали `?? ""`, и предмет вне списка молча
- * исчезал: «Схемотехника» из боевой школы пропадала из фильтров аналитики
- * вместе со всеми своими оценками — не «прочие», а вообще нигде.
+ * РАНЬШЕ ЗДЕСЬ БЫЛ ПЕРЕВОД В СЛАГ. Канонические пять названий превращались в
+ * «programming», «math» и так далее, а всё остальное проходило как есть.
+ * Отсюда шла двойственность: один и тот же предмет в разных срезах выступал
+ * то слагом, то русским словом, и «Схемотехника» однажды пропала из фильтров
+ * аналитики целиком.
  *
- * КАНОНИЧЕСКИЙ СПИСОК НЕ РАСШИРЯЕТСЯ. «Схемотехника» не становится шестым
- * предметом конфига, у неё по-прежнему нет ни цвета, ни иконки отсюда. Она
- * просто проходит через фильтр под собственным именем вместо пустой строки.
- *
- * Для пяти канонических предметов поведение прежнее до буквы: «Английский
- * язык» → "english", как и раньше.
+ * Теперь ключ один и тот же для всех — название. Функция сохранена намеренно:
+ * она называет намерение вызывающего («мне нужен ключ, а не подпись») и
+ * оставляет одно место, если ключ когда-нибудь снова усложнится.
  */
 export function subjectFilterKey(label: string | null | undefined): string {
-  const clean = (label ?? "").trim();
-  if (!clean) return "";
-  return getSubjectKeyByLabel(clean) ?? clean;
-}
-
-/**
- * Обратная сторона `subjectFilterKey`: подпись по ключу. Канонический слаг
- * разворачивается в русское название, всё остальное показывается как есть —
- * а не подменяется словом «Предмет», как это делает getSubjectStyle().label.
- */
-export function subjectLabelOf(key: string | null | undefined): string {
-  const clean = (key ?? "").trim();
-  if (!clean) return "—";
-  return subjects[clean]?.label ?? clean;
+  return (label ?? "").trim();
 }
 
 /**

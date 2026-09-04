@@ -17,10 +17,10 @@ import {
   getMyGroups,
   getNotificationSettings,
   getTeachers,
-  getSubjectStyle,
   upsertNotificationSettings,
   updateStudentAvatar,
 } from "@snr/core";
+import { getSubjectStyle } from "../../lib/subject-style";
 import type { Database, Locale } from "@snr/core";
 import { colors } from "@snr/ui-tokens";
 import { Screen, SegmentedTabs, SubjectIcon } from "../../components";

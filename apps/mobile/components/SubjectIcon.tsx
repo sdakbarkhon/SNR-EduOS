@@ -11,7 +11,7 @@ import {
   Scroll,
   type LucideIcon,
 } from "lucide-react-native";
-import { getSubjectStyle } from "@snr/core";
+import { getSubjectStyle } from "../lib/subject-style";
 
 const ICONS: Record<string, LucideIcon> = {
   bot: Bot,

@@ -5,7 +5,7 @@ import { generateJSON } from "@/lib/ai/gemini-client";
 import { AI_TASKS } from "@/lib/ai/usage";
 import { getGroupPerformance, groupPerformancePromptSection } from "@/lib/ai/group-performance";
 import { getMySchoolNow } from "@/lib/school-time-server";
-import { getSubjectKeyByLabel, subjectDisplay } from "@snr/core";
+import { subjectFilterKey, subjectDisplay } from "@snr/core";
 import { buildLessonGenerationPrompt, разныхТиповНужно, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
 import { uploadImageAndSign } from "@/lib/ai/stage-media-prompts";
@@ -441,7 +441,7 @@ export async function POST(req: NextRequest) {
       .from("subjects").select("name").eq("id", (lesson as { subject_id: string | null }).subject_id).maybeSingle();
     const perf = await getGroupPerformance(db, {
       groupName: group.name ?? "",
-      subjectKey: getSubjectKeyByLabel((subjRow as { name: string } | null)?.name) ?? "",
+      subjectKey: subjectFilterKey((subjRow as { name: string } | null)?.name),
       todayIso: schoolNow.toISOString().slice(0, 10),
     });
     performanceSection = groupPerformancePromptSection(perf);

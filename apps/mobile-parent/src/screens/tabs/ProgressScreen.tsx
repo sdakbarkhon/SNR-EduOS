@@ -51,7 +51,7 @@ import {
   getStudentAttendance,
   getStudentGrades,
   getChildTeacherReviews,
-  getSubjectConfig,
+  resolveSubject,
   getGroupSubjectTeachers,
   getStudentById,
   formatDate,
@@ -237,9 +237,10 @@ function SubjectGridTile({
 
 /** Заход 2, шаг 6 — агрегат «предмет → средний балл» по реальным оценкам
  *  (getStudentGrades, сгруппировано по уже резолвленному subject-ключу).
- *  color — из общего @snr/core getSubjectConfig (10-предметная палитра веба),
- *  НЕ из фикстурного 5-ключевого SubjectId/getSubject() мобилки — реальный
- *  предмет может не входить в узкий фикстурный набор (rus/eng/math/prog/robo). */
+ *  06.09.2026 — подпись и цвет идут через общий resolveSubject, а не через
+ *  снесённый словарь названий: у предмета школы они свои, и придумывать их в
+ *  коде больше нечем. Фикстурный набор мобилки (rus/eng/math/prog/robo) здесь
+ *  не при чём — реальный предмет в него может не входить вовсе. */
 type RealSubjectAgg = {
   subject: string;
   label: string;
@@ -532,7 +533,7 @@ export default function ProgressScreen() {
     }
     return Array.from(map.entries())
       .map(([subject, { sum, count }]) => {
-        const cfg = getSubjectConfig(subject);
+        const cfg = resolveSubject({ slug: subject });
         const meta = subjectMetaByName.get(subject);
         const avg = sum / count;
         return {

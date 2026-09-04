@@ -6,8 +6,7 @@ import {
   Calendar, CheckCircle2, Clock, FileText, Megaphone, Users,
 } from "lucide-react";
 import {
-  findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig,
-  formatTime, formatDate, formatRoom, subjectDisplay,
+  findCurrentLesson, findNextLesson, getDictionary, formatTime, formatDate, formatRoom, subjectDisplay,
   pendingReviewCount, checkedCountOf, isFileSubmissionPending,
 } from "@snr/core";
 import type { Locale, LessonStatus } from "@snr/core";

@@ -28,7 +28,7 @@ import {
   Plus, Link as LinkIcon, Trash2, Search, Video, FileText, FileImage, File as FileIcon, Library, X, BookOpen,
 } from "lucide-react";
 import { useLocale } from "@/components";
-import { resolveSubject, getDictionary, deleteLibraryMaterial } from "@snr/core";
+import { getDictionary, deleteLibraryMaterial } from "@snr/core";
 import type { Locale, LibraryMaterialWithDetails, MyDepartment } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { FileViewerModal } from "@/components/FileViewerModal";
@@ -36,6 +36,26 @@ import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { LibraryUploadModal, LibraryVideoLinkModal } from "@/components/KnowledgeBaseFilePicker";
 import { canUploadToDepartment } from "@/lib/department-library";
 import { ModalPortal } from "@/components/ModalPortal";
+
+/**
+ * ВИД МАТЕРИАЛА — ПО ЕГО КАФЕДРЕ. 06.09.2026.
+ *
+ * Здесь стоял `resolveSubject({ slug: material.subject_slug })`: подпись бралась
+ * из словаря названий по слагу. Словарь снесён, и слаг развернуть нечем — а
+ * главное, право на материал с миграции 255 считается по КАФЕДРЕ, и подпись
+ * честнее брать оттуда же. Учитель видит только свои кафедры, поэтому имя для
+ * любого видимого материала у экрана есть.
+ *
+ * Кафедры нет в списке (материал старый, ссылка пуста) — подписи не будет, как
+ * не было её и раньше у материала без слага.
+ */
+function departmentOf(
+  material: { department_id?: string | null },
+  departments: MyDepartment[],
+): MyDepartment | null {
+  if (!material.department_id) return null;
+  return departments.find((d) => d.id === material.department_id) ?? null;
+}
 
 function iconFor(fileType: string | null, isVideo: boolean) {
   if (isVideo) return Video;
@@ -88,17 +108,20 @@ function MaterialTypeBadge({ materialType, large }: { materialType: string; larg
 // TeacherBookDetailModal (apps/web/app/teacher/books/TeacherBooksView.tsx). ──
 function LibraryMaterialDetailModal({
   material,
+  departments,
   onClose,
   onOpen,
   opening,
 }: {
   material: LibraryMaterialWithDetails;
+  departments: MyDepartment[];
   onClose: () => void;
   onOpen: () => void;
   opening: boolean;
 }) {
   const [visible, setVisible] = useState(false);
-  const style = material.subject_slug ? resolveSubject({ slug: material.subject_slug }) : null;
+  const dep = departmentOf(material, departments);
+  const style = dep ? { label: dep.name, color: dep.color ?? "#64748B" } : null;
   const isVideo = material.content_type !== "file";
 
   useEffect(() => {
@@ -278,6 +301,7 @@ export function TeacherLibraryTabView({
       {selectedMaterial && (
         <LibraryMaterialDetailModal
           material={selectedMaterial}
+          departments={departments}
           onClose={() => setSelectedId(null)}
           onOpen={() => handleOpen(selectedMaterial)}
           opening={openingId === selectedMaterial.id}
@@ -397,7 +421,8 @@ export function TeacherLibraryTabView({
             const isVideo = m.content_type !== "file";
             const Icon = iconFor(m.file_type, isVideo);
             const isMine = m.uploaded_by === initialTeacherId;
-            const style = m.subject_slug ? resolveSubject({ slug: m.subject_slug }) : null;
+            const dep = departmentOf(m, departments);
+            const style = dep ? { label: dep.name, color: dep.color ?? "#64748B" } : null;
             return (
               <div key={m.id} className="group relative cursor-pointer" onClick={() => setSelectedId(m.id)}>
                 <div

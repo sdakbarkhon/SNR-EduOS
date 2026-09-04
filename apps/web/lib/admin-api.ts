@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import {
-  getSubjectKeyByLabel, groupNameKey, GROUP_BULK_MAX, normalizeUzPhone, parentAuthEmail,
+  groupNameKey, GROUP_BULK_MAX, normalizeUzPhone, parentAuthEmail,
   usernameToEmail, MANAGER_EMAIL_DOMAIN,
 } from "@snr/core";
 
@@ -1335,7 +1335,6 @@ export async function createSubjectAssignment(data: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const anySb = sb as any;
     await linkTeacherToGroup(anySb, data.group_id, data.teacher_id, data.school_id);
-    await ensureSubjectSlug(anySb, data.teacher_id, cat.name as string, data.school_id);
   }
   return (row as { id: string }).id;
 }
@@ -1390,7 +1389,6 @@ export async function updateSubjectAssignment(
   // доступ к обеим.
   if (data.teacher_id) {
     await linkTeacherToGroup(anySb, data.group_id, data.teacher_id, schoolId);
-    await ensureSubjectSlug(anySb, data.teacher_id, cat.name as string, schoolId);
   }
   if (prevTeacher && (prevTeacher !== data.teacher_id || prevGroup !== data.group_id)) {
     await unlinkTeacherFromGroupIfUnused(anySb, prevGroup ?? data.group_id, prevTeacher);
@@ -1994,18 +1992,9 @@ export async function applyBulkAssignment(input: {
         итог.failed.push({ subjectName: "—", groupName: имяГруппы(groupId), reason: errorText(e) });
       }
     }
-    // subject_slug ставится ОДИН раз на всю пачку: он у учителя один, и
-    // ensureSubjectSlug всё равно пишет только в пустое. Проверка на
-    // демо-школу внутри неё же, поэтому isDemoSchool здесь не дублируется.
-    const первыйСоСлагом = [...разбор.имена.предметы.values()].find((n) => getSubjectKeyByLabel(n));
-    if (первыйСоСлагом) {
-      try {
-        await ensureSubjectSlug(anySb, input.teacherId, первыйСоСлагом, input.schoolId);
-      } catch {
-        // Слаг — украшение карточки, а не право. Ронять из-за него пачку,
-        // которая уже прошла, нельзя.
-      }
-    }
+    // 06.09.2026 — здесь проставлялся subject_slug карточки. Больше не
+    // проставляется: право на кафедру считается по назначениям, а подпись —
+    // по ним же. Разбор — там, где была ensureSubjectSlug.
   }
   return итог;
 }
@@ -2057,47 +2046,22 @@ async function unlinkTeacherFromGroupIfUnused(
 }
 
 /**
- * Проставляет subject_slug при первом назначении — только в реальных школах и
- * только поверх пустого значения. Разбор почему так — в шапке блока.
+ * ═══ ЗДЕСЬ БЫЛА ensureSubjectSlug. СНЕСЕНА 06.09.2026 ══════════════════════
  *
- * ═══ НЕЗНАКОМОЕ НАЗВАНИЕ БОЛЬШЕ НЕ ИСЧЕЗАЕТ МОЛЧА (04.09.2026) ════════════
+ * Она проставляла `teachers.subject_slug` при первом назначении, переводя
+ * НАЗВАНИЕ предмета в слаг через список в коде. Список снесён — переводить
+ * нечем и, главное, незачем:
  *
- * Здесь стояло `if (!slug) return;` — и это был корень всей истории: предмет
- * с названием вне словаря (например «Science») слага не получал, учитель
- * оставался без кафедры, и НИ ОДНОГО СЛЕДА об этом не оставалось. Три учителя
- * так и жили, пока заказчик не пожаловался.
+ *   • право на библиотеку кафедры с миграции 255 считается по назначениям
+ *     (fn_my_departments), а не по слагу карточки;
+ *   • подпись предмета в шапке учителя и в списке суперадмина берётся из
+ *     назначений — тем же заходом;
+ *   • в демо-школе функция и раньше не писала ничего (ранний выход).
  *
- * ПОЧЕМУ НЕ ОТКАЗ. Уронить назначение из-за подписи было бы хуже болезни:
- * учитель не получил бы ни группы, ни уроков, ни доступа — ради поля, которое
- * влияет ровно на одну вкладку. Поэтому назначение проходит, а случай
- * называется вслух: строка в журнале сервера с точным названием предмета, и
- * вызывающий получает исход, который может показать человеку.
+ * То есть в боевых школах она заполняла колонку, которую больше никто не
+ * читает. КОЛОНКА ОСТАЁТСЯ: её держит витрина — демо-вход выбирает учителя
+ * по слагу (claim_demo_slot), и слаги демо-школы записаны в данных давно.
  */
-type ИсходСлага = "написан" | "уже-был" | "демо-школа" | "нет-в-справочнике";
-
-async function ensureSubjectSlug(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sb: any,
-  teacherId: string,
-  subjectName: string,
-  schoolId: string,
-): Promise<ИсходСлага> {
-  if (await isDemoSchool(schoolId)) return "демо-школа";
-  const slug = getSubjectKeyByLabel(subjectName);
-  if (!slug) {
-    console.warn(
-      `[subject-slug] предмета «${subjectName}» нет в справочнике packages/core/src/config/subjects.ts — `
-      + `учитель ${teacherId} остался без кафедры: библиотека кафедры ему недоступна, пока название не добавят.`,
-    );
-    return "нет-в-справочнике";
-  }
-  const { data: teacher } = await sb
-    .from("teachers").select("subject_slug").eq("id", teacherId).maybeSingle();
-  if (!teacher || teacher.subject_slug) return "уже-был";
-  const { error } = await sb.from("teachers").update({ subject_slug: slug }).eq("id", teacherId);
-  if (error) throw error;
-  return "написан";
-}
 
 /**
  * Назначает (или снимает) учителя на одно назначение предмета — и приводит в
@@ -2139,7 +2103,6 @@ export async function setAssignmentTeacher(
 
   if (teacherId) {
     await linkTeacherToGroup(anySb, row.group_id as string, teacherId, schoolId);
-    await ensureSubjectSlug(anySb, teacherId, row.name as string, schoolId);
   }
   // 03.09.2026, пункт 103. Потерял ли прежний учитель доступ к группе —
   // теперь это ЗНАЮТ, а не догадываются: unlinkTeacherFromGroupIfUnused

@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import {
   getDictionary,
-  getSubjectStyle,
   homeworkCategory,
   type HomeworkWithSubmission,
   type Locale,
