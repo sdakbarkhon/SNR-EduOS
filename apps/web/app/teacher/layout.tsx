@@ -25,13 +25,29 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   // defense-in-depth re-check, not the primary gate, so a single targeted
   // query is enough (same pattern app/admin/layout.tsx already uses).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // Z.3, заход 1 — к тому же запросу добавлен school_id: нужен
-  // SchoolTimeProvider, а лишнего round-trip это не стоит.
   const { data: teacher } = await (supabase as any)
-    .from("teachers").select("id, school_id").eq("user_id", user.id).maybeSingle();
+    .from("teachers").select("id").eq("user_id", user.id).maybeSingle();
   if (!teacher) redirect("/login");
 
-  const schoolId = (teacher as { school_id?: string | null }).school_id ?? null;
+  // ШКОЛЬНОЕ «СЕЙЧАС» — ПО ВЫБРАННОЙ ШКОЛЕ, А НЕ ПО ДОМАШНЕЙ. 06.09.2026.
+  //
+  // Здесь стоял `teachers.school_id` — школа из строки человека. Учитель,
+  // переключившийся на вторую школу, получал часы ПЕРВОЙ: у замороженной
+  // школы это неподвижная дата, и весь интерфейс второй школы жил бы её
+  // «сегодня» — расписание, подсветка текущего урока, запрет старта уроков за
+  // прошедший день.
+  //
+  // Спрашиваем базу: `current_school_id()` знает и про выбор, и про запасной
+  // ход на домашнюю школу. Своей копии этих правил здесь нет.
+  //
+  // ПОЧЕМУ НЕ getMySchoolFrozenDate, который делает ровно это. Провайдеру
+  // нужен ещё и идентификатор школы, а тот резолвер отдаёт только дату:
+  // позвать оба значило бы спросить базу о школе дважды. Зато теперь обе
+  // величины провайдера описывают ОДНУ школу — прежде школа и её часы могли
+  // разъехаться.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: выбранная } = await (supabase as any).rpc("current_school_id");
+  const schoolId = (выбранная as string | null) ?? null;
   const frozenDate = await getSchoolFrozenDate(supabase, schoolId);
 
   // Демо-режим — свойство СЕССИИ, не аккаунта: под teacher_math может сидеть
