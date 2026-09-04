@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateJSON } from "@/lib/ai/gemini-client";
-import { AI_TASKS } from "@/lib/ai/usage";
-import { buildCurriculumParsePrompt, buildBookToPlanPrompt } from "@/lib/ai/prompts";
-import { CURRICULUM_TOPICS_SCHEMA } from "@/lib/ai/schemas";
-import { extractText, mimeFromName } from "@/lib/file-extractors";
+import { разобратьВТемы } from "@/lib/curriculum-parse";
+import { этоНашФайл, csvВТемы } from "@/lib/curriculum-csv";
 import {
   updateCurriculumPlanProgress, markCurriculumPlanReady, markCurriculumPlanError,
   updateCurriculumPlanStage, markCurriculumPlanPreview,
 } from "@snr/core";
-import { buildBookOutline } from "@/lib/ai/book-outline";
 
 // Большой фикс, Блок 6, ЗАДАЧА 1 — фоновый воркер парсинга учебного плана.
 // Триггерится fire-and-forget'ом из create-processing/route.ts (или
@@ -31,8 +27,6 @@ export const runtime = "nodejs";
 // /api/stage-media/generate.
 export const maxDuration = 300;
 
-const MAX_TOPICS = 40;
-type ParsedTopic = { title: string; description: string | null; estimated_lessons: number };
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const secret = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -77,6 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let sourceName: string;
     let bookTitle = "";
     let bookSubject = "";
+    let grade = "—";
     if (fromBook) {
       const { data: book } = await anyDb
         .from("books").select("title, subject, file_storage_path").eq("id", plan.source_book_id).maybeSingle();
@@ -87,6 +82,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const { data: fileData, error: dlErr } = await db.storage.from("books").download(sourceName);
       if (dlErr || !fileData) throw new Error("Не удалось скачать книгу из библиотеки");
       buffer = Buffer.from(await fileData.arrayBuffer());
+      const { data: grp } = await anyDb.from("groups").select("name").eq("id", plan.group_id).maybeSingle();
+      grade = String((grp as { name: string } | null)?.name ?? "—");
     } else {
       sourceName = plan.source_file_url as string;
       const { data: fileData, error: dlErr } = await db.storage.from("curriculum-plans").download(sourceName);
@@ -94,62 +91,39 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       buffer = Buffer.from(await fileData.arrayBuffer());
     }
 
-    // ── Извлечение текста ───────────────────────────────────────────────────
-    await updateCurriculumPlanStage(db, planId, "extract", 35);
-    // Для учебника берём ВЕСЬ текст: структура книги ищется по заголовкам во
-    // всей толще, и обрезка на пятидесяти тысячах оставила бы от толстого
-    // учебника первые двадцать страниц. Сжатием занимается book-outline ниже.
-    const extracted = await extractText(buffer, mimeFromName(sourceName), sourceName, fromBook ? 4_000_000 : undefined);
-    const sourceText = extracted.text;
-    if (!sourceText.trim()) {
-      throw new Error(fromBook
-        ? "Из книги не удалось извлечь текст — возможно, это скан без текстового слоя"
-        : "Файл пуст или не удалось извлечь текст");
-    }
-
-    // ── Скелет книги ────────────────────────────────────────────────────────
-    let prompt: string;
-    if (fromBook) {
-      await updateCurriculumPlanStage(db, planId, "outline", 50);
-      const outline = buildBookOutline(sourceText);
-      console.log(`[background-parse] книга ${bookTitle}: ${outline.sourceChars} символов`
-        + (outline.condensed ? ` -> выжимка ${outline.text.length}, заголовков ${outline.headingCount}` : " — целиком"));
-      const { data: grp } = await anyDb.from("groups").select("name").eq("id", plan.group_id).maybeSingle();
-      prompt = buildBookToPlanPrompt({
-        bookTitle,
-        subject: bookSubject || "—",
-        grade: String((grp as { name: string } | null)?.name ?? "—"),
-        outline: outline.text,
-        condensed: outline.condensed,
-        headingCount: outline.headingCount,
-        maxTopics: MAX_TOPICS,
-      });
-    } else {
-      prompt = buildCurriculumParsePrompt(sourceText, MAX_TOPICS);
-    }
-
-    // ── Модель ──────────────────────────────────────────────────────────────
-    await updateCurriculumPlanStage(db, planId, "model", 65);
-    let topics: ParsedTopic[] | null = null;
-    let lastError: string | null = null;
-    for (let attempt = 0; attempt < 3 && !topics; attempt++) {
-      const { data: parsed, error } = await generateJSON<Partial<ParsedTopic>[]>(prompt, CURRICULUM_TOPICS_SCHEMA, {
-        model: "pro",
-        usage: { task: fromBook ? AI_TASKS.bookToPlan : AI_TASKS.curriculumParse },
-      });
-      if (error || !Array.isArray(parsed) || parsed.length === 0) {
-        lastError = error || "Не удалось разобрать ответ AI";
-        continue;
+    // ── НАШ ФАЙЛ ЧИТАЕТСЯ БЕЗ МОДЕЛИ ────────────────────────────────────────
+    //
+    // Учитель принёс файл, который мы же ему и отдали кнопкой «Создать учебный
+    // план»: темы в нём уже готовы. Звать модель второй раз — платить за то,
+    // что посчитано. Признак — метка в первой строке; нет метки, файл чужой,
+    // и он разбирается как раньше.
+    if (!fromBook) {
+      const текст = buffer.toString("utf-8");
+      if (этоНашФайл(текст)) {
+        const свои = csvВТемы(текст);
+        if (свои.length === 0) throw new Error("В файле нет ни одной темы");
+        await updateCurriculumPlanStage(db, planId, "save", 90);
+        await markCurriculumPlanReady(db, planId, свои.map((t) => ({
+          title: t.title, description: t.description, estimatedLessons: t.estimated_lessons,
+        })));
+        return NextResponse.json({ ok: true, topicsCount: свои.length, preview: false, ourFile: true });
       }
-      topics = parsed.slice(0, MAX_TOPICS).map((t) => ({
-        title: String(t.title ?? "").trim() || "Без названия",
-        description: t.description ? String(t.description).trim() : null,
-        estimated_lessons: Number.isFinite(t.estimated_lessons) && Number(t.estimated_lessons) > 0
-          ? Math.round(Number(t.estimated_lessons))
-          : 1,
-      }));
     }
-    if (!topics) throw new Error(lastError || "Не удалось распарсить план");
+
+    // ── Разбор ──────────────────────────────────────────────────────────────
+    // Извлечение текста, промпт, модель и приведение тем к одной форме живут
+    // в lib/curriculum-parse.ts — там же, откуда их берёт заказ на файл.
+    // Второй копии этой цепочки в проекте нет.
+    const topics = await разобратьВТемы(
+      fromBook
+        ? { вид: "книга", buffer, sourceName, bookTitle, subject: bookSubject, grade }
+        : { вид: "файл-плана", buffer, sourceName },
+      async (s) => {
+        if (s === "extract") await updateCurriculumPlanStage(db, planId, "extract", 35);
+        else if (s === "outline") await updateCurriculumPlanStage(db, planId, "outline", 50);
+        else await updateCurriculumPlanStage(db, planId, "model", 65);
+      },
+    );
 
     await updateCurriculumPlanStage(db, planId, "save", 90);
     const rows = topics.map((t) => ({ title: t.title, description: t.description, estimatedLessons: t.estimated_lessons }));

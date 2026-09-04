@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processEmbeddingQueueBatch, QUEUE_MAX_ATTEMPTS } from "@/lib/ai/process-embedding-queue";
+import { убратьПросроченныеЗаказы } from "@/lib/purge-plan-drafts";
 
 /**
  * Потолок времени функции. На тарифе hobby и по умолчанию, и максимум — 300
@@ -59,6 +60,17 @@ async function handler(req: NextRequest) {
   const db = createAdminClient();
   const startedAt = Date.now();
 
+  // ── УБОРКА ЗАКАЗОВ НА РАЗБОР УЧЕБНИКА (прицепом) ─────────────────────────
+  //
+  // Отдельного крона не заводим: своего расписания у уборки нет, работы на
+  // доли секунды, а лишний крон — это ещё одна ручка, ещё один секрет и ещё
+  // одно место, где что-то молча не сработает.
+  //
+  // ПОЧЕМУ ДО ОСНОВНОЙ РАБОТЫ И ВНЕ ЕЁ try. Разбор очереди векторов зовёт
+  // платную модель и может отвалиться; уборка от этого зависеть не должна.
+  // Своя ошибка уборки тоже не должна ронять крон — она только пишется в лог.
+  const убрано = await убратьПросроченныеЗаказы(db);
+
   try {
     // Пустая очередь — выходим, не потратив ни одного вызова модели. Это
     // счётная выборка без строк (head), самая дешёвая проверка, какая есть.
@@ -78,7 +90,7 @@ async function handler(req: NextRequest) {
 
     if (!pending) {
       console.log(`[rag-process-queue] очередь пуста, вызовов модели ноль; отложено=${parked ?? 0}`);
-      return NextResponse.json({ skipped: "empty_queue", pending: 0, parked: parked ?? 0 });
+      return NextResponse.json({ skipped: "empty_queue", pending: 0, parked: parked ?? 0, покойныеЗаказы: убрано });
     }
 
     const res = await processEmbeddingQueueBatch(db, BATCH_LIMIT);
@@ -98,7 +110,7 @@ async function handler(req: NextRequest) {
     if (res.errors > 0) console.error(line);
     else console.log(line);
 
-    return NextResponse.json({ ...res, pending, parked: parked ?? 0, ms });
+    return NextResponse.json({ ...res, pending, parked: parked ?? 0, ms, покойныеЗаказы: убрано });
   } catch (e) {
     const msg = (e as Error)?.message ?? "process queue failed";
     console.error("[rag-process-queue] failed:", msg);
