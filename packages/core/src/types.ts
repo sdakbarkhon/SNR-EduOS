@@ -445,6 +445,9 @@ export type LibraryMaterial = {
   // programming/robotics/math/english/russian. Куратор загружать не может
   // (RLS insert), поэтому NULL здесь на практике не встречается.
   subject_slug: string | null;
+  /** Миграция 255 — кафедра материала. Единственное, по чему считается право
+   *  доступа: политики библиотеки смотрят сюда, а не на слаг выше. */
+  department_id?: string | null;
   title: string;
   content_type: LibraryMaterialContentType;
   // Путь в бакете "materials" (переиспользуем существующий бакет):
@@ -475,6 +478,19 @@ export type LibraryMaterial = {
 };
 
 export type LibraryMaterialGroup = { id: string; name: string };
+
+/**
+ * Кафедра текущего учителя — то, что отдаёт fn_my_departments() (миграция
+ * 255). Вид (icon/color) заполнен, только пока у кафедры один предмет: у
+ * слитой кафедры общего вида нет, и подставлять чей-то один значило бы
+ * угадывать.
+ */
+export type MyDepartment = {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+};
 
 export type LibraryMaterialWithDetails = LibraryMaterial & {
   uploader_name: string | null;

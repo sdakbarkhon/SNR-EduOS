@@ -157,7 +157,8 @@ export function AdminSubjectsView({
             .replace("{assignments}", String(impact.assignments))
             .replace("{lessons}", String(impact.lessons))
             .replace("{homework}", String(impact.homework))
-            .replace("{plans}", String(impact.plans)));
+            .replace("{plans}", String(impact.plans))
+            .replace("{materials}", String(impact.materials)));
           return;
         }
         if (!confirm(`${d.catalogSubjectDeleteTitle}: «${row.name}». ${d.catalogSubjectDeleteClean}`)) return;

@@ -760,7 +760,7 @@ export interface Dictionary {
     gradeFromGroupUnknown: string;
     catalogSubjectDeleteTitle: string;
     catalogSubjectDeleteClean: string;
-    catalogSubjectInUseHint: string;  // "{assignments} {lessons} {homework} {plans}"
+    catalogSubjectInUseHint: string;  // "{assignments} {lessons} {homework} {plans} {materials}"
     hideInsteadBtn: string;
     // groups
     groupsTitle: string;
@@ -1453,7 +1453,7 @@ export interface Dictionary {
     teacherHasLessons: string;      // "{count}"
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"
-    catalogSubjectInUse: string;    // "{assignments} {lessons} {homework} {plans}"
+    catalogSubjectInUse: string;    // "{assignments} {lessons} {homework} {plans} {materials}"
     genericPrefix: string;   // "Ошибка: "
   };
   parentUi: {

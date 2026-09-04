@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { useLocale } from "@/components";
 import { resolveSubject, getDictionary, deleteLibraryMaterial } from "@snr/core";
-import type { Locale, LibraryMaterialWithDetails } from "@snr/core";
+import type { Locale, LibraryMaterialWithDetails, MyDepartment } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { FileViewerModal } from "@/components/FileViewerModal";
 import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
@@ -167,15 +167,13 @@ export function TeacherLibraryTabView({
   initialMaterials,
   groups,
   initialTeacherId,
-  initialSubjectSlug,
-  subjectSlugs,
+  departments,
 }: {
   initialMaterials: LibraryMaterialWithDetails[];
   groups: Array<{ id: string; name: string }>;
   initialTeacherId: string;
-  initialSubjectSlug: string | null;
-  /** Все предметы учителя (fn_my_subject_slugs). */
-  subjectSlugs: string[];
+  /** Кафедры учителя (fn_my_departments) — и право, и список для отбора. */
+  departments: MyDepartment[];
 }) {
   const router = useRouter();
   const { locale } = useLocale();
@@ -187,7 +185,7 @@ export function TeacherLibraryTabView({
   const [error, setError] = useState<string | null>(null);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
-  const [filterSubject, setFilterSubject] = useState<string>(initialSubjectSlug ?? "all");
+  const [filterDepartment, setFilterDepartment] = useState<string>("all");
   const [viewer, setViewer] = useState<{ url: string; title: string; fileName: string } | null>(null);
   // K.1, 05.08.2026 — video_mp4-материалы (bucket lesson-videos) рендерятся
   // через VideoEmbedPlayer, не FileViewerModal (тот не умеет .mp4).
@@ -201,23 +199,18 @@ export function TeacherLibraryTabView({
     return () => clearTimeout(t);
   }, [rawQuery]);
 
-  // «Есть ли у меня кафедра» — по тому же списку предметов, что смотрит база
-  // (fn_my_subject_slugs). См. lib/department-library.ts.
-  const hasDepartment = canUploadToDepartment(subjectSlugs);
-
-  const subjectsPresent = useMemo(() => {
-    const set = new Set(materials.map((m) => m.subject_slug).filter(Boolean));
-    return Array.from(set) as string[];
-  }, [materials]);
+  // «Есть ли у меня кафедра» — по тому же списку, что смотрит база
+  // (fn_my_departments). См. lib/department-library.ts.
+  const hasDepartment = canUploadToDepartment(departments);
 
   const displayed = useMemo(() => {
     const q = query.toLowerCase();
     return materials.filter((m) => {
-      const matchSubject = filterSubject === "all" || m.subject_slug === filterSubject;
+      const matchDepartment = filterDepartment === "all" || m.department_id === filterDepartment;
       const matchQuery = !q || m.title.toLowerCase().includes(q) || (m.uploader_name ?? "").toLowerCase().includes(q);
-      return matchSubject && matchQuery;
+      return matchDepartment && matchQuery;
     });
-  }, [materials, query, filterSubject]);
+  }, [materials, query, filterDepartment]);
 
   const selectedMaterial = selectedId ? (materials.find((m) => m.id === selectedId) ?? null) : null;
 
@@ -322,8 +315,7 @@ export function TeacherLibraryTabView({
         <LibraryUploadModal
           groups={groups}
           teacherId={initialTeacherId}
-          subjectSlug={initialSubjectSlug ?? ""}
-          subjectSlugs={subjectSlugs}
+          departments={departments}
           dt={dt}
           onClose={() => setShowUpload(false)}
           onSuccess={handleUploadSuccess}
@@ -332,8 +324,7 @@ export function TeacherLibraryTabView({
       {showVideo && (
         <LibraryVideoLinkModal
           groups={groups}
-          subjectSlug={initialSubjectSlug ?? ""}
-          subjectSlugs={subjectSlugs}
+          departments={departments}
           dt={dt}
           onClose={() => setShowVideo(false)}
           onSuccess={handleVideoSuccess}
@@ -376,15 +367,15 @@ export function TeacherLibraryTabView({
             />
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           </div>
-          {subjectsPresent.length > 1 && (
+          {departments.length > 1 && (
             <select
-              value={filterSubject}
-              onChange={(e) => setFilterSubject(e.target.value)}
+              value={filterDepartment}
+              onChange={(e) => setFilterDepartment(e.target.value)}
               className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
             >
-              <option value="all">Все предметы</option>
-              {subjectsPresent.map((s) => (
-                <option key={s} value={s}>{resolveSubject({ slug: s }).label}</option>
+              <option value="all">Все кафедры</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
           )}

@@ -751,7 +751,7 @@ export const ru: Dictionary = {
     gradeFromGroupUnknown: "—",
     catalogSubjectDeleteTitle: "Удалить предмет из справочника",
     catalogSubjectDeleteClean: "Предмет нигде не назначен — удаление безопасно.",
-    catalogSubjectInUseHint: "Предмет назначен {assignments} раз: {lessons} уроков, {homework} заданий, {plans} планов. Удалить нельзя — можно скрыть.",
+    catalogSubjectInUseHint: "Предмет назначен {assignments} раз: {lessons} уроков, {homework} заданий, {plans} планов, {materials} материалов кафедры. Удалить нельзя — можно скрыть.",
     hideInsteadBtn: "Скрыть вместо удаления",
     groupsTitle: "Группы",
     addGroupTitle: "Создать группу",
@@ -1428,7 +1428,7 @@ export const ru: Dictionary = {
     teacherHasLessons: "Нельзя удалить: учитель ведёт {count} уроков. Сначала передайте предметы другому учителю.",
     teacherHasGrades: "Нельзя удалить: под оценками и решениями учителя стоит {count} записей — их нельзя оставить без автора.",
     subjectInUse: "Нельзя удалить: {lessons} уроков, {homework} заданий, {plans} учебных планов. Уберите их или скройте предмет.",
-    catalogSubjectInUse: "Нельзя удалить: предмет назначен {assignments} раз ({lessons} уроков, {homework} заданий, {plans} планов). Его можно скрыть.",
+    catalogSubjectInUse: "Нельзя удалить: предмет назначен {assignments} раз ({lessons} уроков, {homework} заданий, {plans} планов, {materials} материалов кафедры). Его можно скрыть.",
     genericPrefix: "Ошибка: ",
   },
   parentUi: {

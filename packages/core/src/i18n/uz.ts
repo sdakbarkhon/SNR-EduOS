@@ -749,7 +749,7 @@ export const uz: Dictionary = {
     gradeFromGroupUnknown: "—",
     catalogSubjectDeleteTitle: "Fanni ro'yxatdan o'chirish",
     catalogSubjectDeleteClean: "Fan hech qayerda biriktirilmagan — o'chirish xavfsiz.",
-    catalogSubjectInUseHint: "Fan {assignments} marta biriktirilgan: {lessons} dars, {homework} topshiriq, {plans} reja. O'chirib bo'lmaydi — yashiring.",
+    catalogSubjectInUseHint: "Fan {assignments} marta biriktirilgan: {lessons} dars, {homework} topshiriq, {plans} reja, {materials} kafedra materiali. O'chirib bo'lmaydi — yashiring.",
     hideInsteadBtn: "O'chirish o'rniga yashirish",
     groupsTitle: "Guruhlar",
     addGroupTitle: "Guruh yaratish",
@@ -1424,7 +1424,7 @@ export const uz: Dictionary = {
     teacherHasLessons: "O'chirib bo'lmaydi: o'qituvchi {count} ta dars olib boradi. Avval fanlarni boshqasiga topshiring.",
     teacherHasGrades: "O'chirib bo'lmaydi: {count} ta baho va qaror shu o'qituvchi nomida — ularni muallifsiz qoldirib bo'lmaydi.",
     subjectInUse: "O'chirib bo'lmaydi: {lessons} dars, {homework} topshiriq, {plans} o'quv reja. Ularni olib tashlang yoki fanni yashiring.",
-    catalogSubjectInUse: "O'chirib bo'lmaydi: fan {assignments} marta biriktirilgan ({lessons} dars, {homework} topshiriq, {plans} reja). Uni yashirish mumkin.",
+    catalogSubjectInUse: "O'chirib bo'lmaydi: fan {assignments} marta biriktirilgan ({lessons} dars, {homework} topshiriq, {plans} reja, {materials} kafedra materiali). Uni yashirish mumkin.",
     genericPrefix: "Xatolik: ",
   },
   parentUi: {

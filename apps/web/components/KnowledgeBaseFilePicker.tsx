@@ -30,7 +30,7 @@ import {
   X, Search, FileText, FileImage, Video, File as FileIcon, Link as LinkIcon, BookOpen,
   Plus, Upload, Trash2,
 } from "lucide-react";
-import type { MaterialWithGroup, Book, LibraryMaterialWithDetails } from "@snr/core";
+import type { MaterialWithGroup, Book, LibraryMaterialWithDetails, MyDepartment } from "@snr/core";
 import { resolveSubject,
   getDictionary,
   getLibraryMaterials,
@@ -48,6 +48,7 @@ import { parseVideoUrl } from "@/lib/video-url";
 import { uploadVideoFile } from "@/lib/video-storage";
 import { canUploadToDepartment } from "@/lib/department-library";
 import { mySchoolStoragePath } from "@snr/core";
+import { subjectIconByName } from "@/lib/subject-icons";
 import { ModalPortal } from "@/components/ModalPortal";
 
 export type PickedKnowledgeBaseFile = {
@@ -158,17 +159,15 @@ function formatLibSize(bytes: number): string {
 export function LibraryUploadModal({
   groups,
   teacherId,
-  subjectSlug,
-  subjectSlugs,
+  departments,
   dt,
   onClose,
   onSuccess,
 }: {
   groups: Array<{ id: string; name: string }>;
   teacherId: string;
-  subjectSlug: string;
-  /** Все предметы учителя; при длине > 1 в форме появляется выбор. */
-  subjectSlugs?: string[];
+  /** Кафедры учителя; при длине > 1 в форме появляется выбор. */
+  departments: MyDepartment[];
   dt: ReturnType<typeof getDictionary>["teacher"];
   onClose: () => void;
   onSuccess: () => void;
@@ -182,8 +181,8 @@ export function LibraryUploadModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const slugs = subjectSlugs && subjectSlugs.length > 0 ? subjectSlugs : [subjectSlug];
-  const [activeSlug, setActiveSlug] = useState(slugs[0] ?? subjectSlug);
+  const [activeDepartmentId, setActiveDepartmentId] = useState(departments[0]?.id ?? "");
+  const activeDepartment = departments.find((d) => d.id === activeDepartmentId) ?? departments[0] ?? null;
   const allClasses = selectedGroupIds.size === 0;
 
   function toggleGroup(id: string) {
@@ -222,7 +221,7 @@ export function LibraryUploadModal({
         clearInterval(ramp);
         setProgress(95);
         await createLibraryMaterial(sb, {
-          subjectSlug: activeSlug,
+          departmentId: activeDepartmentId,
           contentType: "video_mp4",
           title: title.trim(),
           storagePath: uploaded.storagePath,
@@ -243,7 +242,7 @@ export function LibraryUploadModal({
         setProgress(95);
 
         await createLibraryMaterial(sb, {
-          subjectSlug: activeSlug,
+          departmentId: activeDepartmentId,
           title: title.trim(),
           storagePath,
           fileType: file.type || null,
@@ -290,39 +289,42 @@ export function LibraryUploadModal({
               />
             </div>
 
-            {/* Предмет. У однопредметного учителя — просто подпись, как было.
-                У многопредметного — выбор: он ведёт несколько кафедр, и материал
-                обязан попасть в ту, которую он назовёт сам. Список приходит из
-                fn_my_subject_slugs — той же функции, что стоит в политике
-                вставки, поэтому «выбрал в интерфейсе, а база отказала» тут
-                невозможно. */}
+            {/* Кафедра. У учителя с одной кафедрой — просто подпись, как было.
+                С несколькими — выбор: материал обязан попасть в ту, которую он
+                назовёт сам. Список приходит из fn_my_departments — той же
+                функции, что стоит в политике вставки, поэтому «выбрал в
+                интерфейсе, а база отказала» тут невозможно. */}
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
-              {slugs.length > 1 ? (
+              {departments.length > 1 ? (
                 <div className="flex flex-wrap gap-2">
-                  {slugs.map((s) => {
-                    const active = s === activeSlug;
+                  {departments.map((dep) => {
+                    const active = dep.id === activeDepartmentId;
+                    const DepIcon = subjectIconByName(dep.icon);
                     return (
                       <button
-                        key={s}
+                        key={dep.id}
                         type="button"
-                        onClick={() => setActiveSlug(s)}
+                        onClick={() => setActiveDepartmentId(dep.id)}
                         className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
                           active
                             ? "border-blue-400 bg-blue-50 font-semibold text-blue-700"
                             : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                         }`}
                       >
-                        <SubjectIcon subject={s} size={18} />
-                        {resolveSubject({ slug: s }).label}
+                        <DepIcon className="h-[18px] w-[18px]" style={{ color: dep.color ?? undefined }} />
+                        {dep.name}
                       </button>
                     );
                   })}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-                  <SubjectIcon subject={activeSlug} size={22} />
-                  {resolveSubject({ slug: activeSlug }).label}
+                  {(() => {
+                    const DepIcon = subjectIconByName(activeDepartment?.icon);
+                    return <DepIcon className="h-[22px] w-[22px]" style={{ color: activeDepartment?.color ?? undefined }} />;
+                  })()}
+                  {activeDepartment?.name ?? ""}
                 </div>
               )}
             </div>
@@ -433,16 +435,14 @@ export function LibraryUploadModal({
 
 export function LibraryVideoLinkModal({
   groups,
-  subjectSlug,
-  subjectSlugs,
+  departments,
   dt,
   onClose,
   onSuccess,
 }: {
   groups: Array<{ id: string; name: string }>;
-  subjectSlug: string;
-  /** Все предметы учителя; при длине > 1 в форме появляется выбор. */
-  subjectSlugs?: string[];
+  /** Кафедры учителя; при длине > 1 в форме появляется выбор. */
+  departments: MyDepartment[];
   dt: ReturnType<typeof getDictionary>["teacher"];
   onClose: () => void;
   onSuccess: () => void;
@@ -453,8 +453,8 @@ export function LibraryVideoLinkModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const slugs = subjectSlugs && subjectSlugs.length > 0 ? subjectSlugs : [subjectSlug];
-  const [activeSlug, setActiveSlug] = useState(slugs[0] ?? subjectSlug);
+  const [activeDepartmentId, setActiveDepartmentId] = useState(departments[0]?.id ?? "");
+  const activeDepartment = departments.find((d) => d.id === activeDepartmentId) ?? departments[0] ?? null;
   const allClasses = selectedGroupIds.size === 0;
   // Клиентский парсинг — тот же parseVideoUrl, что уже используют материалы
   // урока (Пачка 4); никакого серверного oEmbed-запроса, без CORS.
@@ -478,7 +478,7 @@ export function LibraryVideoLinkModal({
     setSaving(true);
     try {
       await createLibraryMaterial(createClient(), {
-        subjectSlug: activeSlug,
+        departmentId: activeDepartmentId,
         // Миграция 175 — прямая .mp4-ссылка наконец сохраняется. До неё ветка
         // video_mp4 в CHECK требовала storage_path, и .mp4-ссылку хранить было
         // негде: сначала она молча ложилась как video_rutube (порча данных),
@@ -527,35 +527,39 @@ export function LibraryVideoLinkModal({
               />
             </div>
 
-            {/* Предмет: у многопредметного учителя — выбор, у остальных подпись.
+            {/* Кафедра: у учителя с несколькими — выбор, у остальных подпись.
                 Пояснение — у такого же блока выше. */}
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
-              {slugs.length > 1 ? (
+              {departments.length > 1 ? (
                 <div className="flex flex-wrap gap-2">
-                  {slugs.map((s) => {
-                    const active = s === activeSlug;
+                  {departments.map((dep) => {
+                    const active = dep.id === activeDepartmentId;
+                    const DepIcon = subjectIconByName(dep.icon);
                     return (
                       <button
-                        key={s}
+                        key={dep.id}
                         type="button"
-                        onClick={() => setActiveSlug(s)}
+                        onClick={() => setActiveDepartmentId(dep.id)}
                         className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
                           active
                             ? "border-blue-400 bg-blue-50 font-semibold text-blue-700"
                             : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                         }`}
                       >
-                        <SubjectIcon subject={s} size={18} />
-                        {resolveSubject({ slug: s }).label}
+                        <DepIcon className="h-[18px] w-[18px]" style={{ color: dep.color ?? undefined }} />
+                        {dep.name}
                       </button>
                     );
                   })}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-                  <SubjectIcon subject={activeSlug} size={22} />
-                  {resolveSubject({ slug: activeSlug }).label}
+                  {(() => {
+                    const DepIcon = subjectIconByName(activeDepartment?.icon);
+                    return <DepIcon className="h-[22px] w-[22px]" style={{ color: activeDepartment?.color ?? undefined }} />;
+                  })()}
+                  {activeDepartment?.name ?? ""}
                 </div>
               )}
             </div>
@@ -731,17 +735,16 @@ export function KnowledgeBaseFilePicker({
   // что была на снесённой странице /teacher/library.
   const [myTeacher, setMyTeacher] = useState<{ id: string; subject_slug: string | null } | null>(null);
   /**
-   * МОИ ПРЕДМЕТЫ — ИЗ ТОЙ ЖЕ ФУНКЦИИ, ЧТО У ВКЛАДКИ БИБЛИОТЕКИ (04.09.2026).
+   * МОИ КАФЕДРЫ — ИЗ ТОЙ ЖЕ ФУНКЦИИ, ЧТО У ВКЛАДКИ БИБЛИОТЕКИ.
    *
    * Здесь спрашивали колонку карточки `teachers.subject_slug`, а вкладка
-   * библиотеки — `fn_my_subject_slugs()`. Два ответа на один вопрос в одном
-   * экране: у одного и того же учителя кнопка загрузки могла быть на вкладке
-   * и не быть в выборе файлов. Теперь источник один — тот же, что в правиле
-   * вставки.
+   * библиотеки — функцию базы. Два ответа на один вопрос в одном экране: у
+   * одного и того же учителя кнопка загрузки могла быть на вкладке и не быть
+   * в выборе файлов. Источник один — тот же, что в правиле вставки.
    */
-  const [mySubjectSlugs, setMySubjectSlugs] = useState<string[]>([]);
+  const [myDepartments, setMyDepartments] = useState<MyDepartment[]>([]);
   const [myGroups, setMyGroups] = useState<Array<{ id: string; name: string }>>([]);
-  const hasDepartment = canUploadToDepartment(mySubjectSlugs);
+  const hasDepartment = canUploadToDepartment(myDepartments);
   const [showLibUpload, setShowLibUpload] = useState(false);
   const [showLibVideo, setShowLibVideo] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -794,17 +797,14 @@ export function KnowledgeBaseFilePicker({
       if (teacherRes.status === "fulfilled") {
         const t = teacherRes.value as unknown as { id: string; subject_slug: string | null };
         setMyTeacher({ id: t.id, subject_slug: t.subject_slug });
-        // Список предметов — отдельным вопросом к базе, тем же, что у вкладки.
+        // Список кафедр — отдельным вопросом к базе, тем же, что у вкладки.
         // Ошибка здесь не должна ронять весь выбор файлов: без списка просто
         // не будет кнопок загрузки в кафедру.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (sb as any).rpc("fn_my_subject_slugs").then((r: { data: unknown }) => {
-          const rows = (r?.data ?? []) as Array<{ subject_slug: string } | string>;
-          setMySubjectSlugs(
-            rows.map((x) => (typeof x === "string" ? x : x.subject_slug)).filter(Boolean) as string[],
-          );
+        (sb as any).rpc("fn_my_departments").then((r: { data: unknown }) => {
+          setMyDepartments(((r?.data ?? []) as MyDepartment[]).filter((x) => x && x.id));
         }).catch((e: unknown) => {
-          console.error("[KnowledgeBaseFilePicker] не удалось прочитать список предметов:", e);
+          console.error("[KnowledgeBaseFilePicker] не удалось прочитать список кафедр:", e);
         });
       } else {
         console.error("[KnowledgeBaseFilePicker] failed to resolve current teacher:", teacherRes.reason);
@@ -1027,10 +1027,9 @@ export function KnowledgeBaseFilePicker({
 
           {/* Уборка — загрузка/видео-ссылка теперь живут прямо во вкладке
               "Библиотека учителей" (была отдельная страница /teacher/library).
-              Куратор (subject_slug NULL) видит вкладку, но не эти кнопки —
-              RLS insert на teacher_library_materials требует subject_slug,
-              createLibraryMaterial() тоже фейлится для куратора с понятной
-              ошибкой, но проще не показывать то, что всё равно не сработает. */}
+              Учитель без кафедр видит вкладку, но не эти кнопки — политика
+              вставки требует кафедру из fn_my_departments(), и класть ему
+              некуда. Проще не показывать то, что всё равно не сработает. */}
           {tab === "teacherLibrary" && canManageLibrary && (
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
               <button
@@ -1150,8 +1149,7 @@ export function KnowledgeBaseFilePicker({
           <LibraryUploadModal
             groups={myGroups}
             teacherId={myTeacher.id}
-            subjectSlug={mySubjectSlugs[0] ?? ""}
-            subjectSlugs={mySubjectSlugs}
+            departments={myDepartments}
             dt={dt}
             onClose={() => setShowLibUpload(false)}
             onSuccess={() => { setShowLibUpload(false); refetchLibrary(); }}
@@ -1160,8 +1158,7 @@ export function KnowledgeBaseFilePicker({
         {showLibVideo && myTeacher && hasDepartment && (
           <LibraryVideoLinkModal
             groups={myGroups}
-            subjectSlug={mySubjectSlugs[0] ?? ""}
-            subjectSlugs={mySubjectSlugs}
+            departments={myDepartments}
             dt={dt}
             onClose={() => setShowLibVideo(false)}
             onSuccess={() => { setShowLibVideo(false); refetchLibrary(); }}

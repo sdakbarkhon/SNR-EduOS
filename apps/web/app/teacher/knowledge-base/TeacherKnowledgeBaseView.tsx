@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FolderOpen, Library, GraduationCap } from "lucide-react";
-import type { MaterialWithGroup, Book, LibraryMaterialWithDetails } from "@snr/core";
+import type { MaterialWithGroup, Book, LibraryMaterialWithDetails, MyDepartment } from "@snr/core";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components";
@@ -19,8 +19,7 @@ export function TeacherKnowledgeBaseView({
   books,
   coverUrls,
   libraryMaterials,
-  initialSubjectSlug,
-  subjectSlugs,
+  departments,
 }: {
   materials: MaterialWithGroup[];
   groups: TeacherGroup[];
@@ -28,9 +27,8 @@ export function TeacherKnowledgeBaseView({
   books: Book[];
   coverUrls: Record<string, string>;
   libraryMaterials: LibraryMaterialWithDetails[];
-  initialSubjectSlug: string | null;
-  /** Все предметы учителя (fn_my_subject_slugs). */
-  subjectSlugs: string[];
+  /** Кафедры учителя (fn_my_departments). */
+  departments: MyDepartment[];
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).knowledgeBase;
@@ -76,8 +74,7 @@ export function TeacherKnowledgeBaseView({
           initialMaterials={libraryMaterials}
           groups={groups}
           initialTeacherId={initialTeacherId}
-          initialSubjectSlug={initialSubjectSlug}
-          subjectSlugs={subjectSlugs}
+          departments={departments}
         />
       </div>
     </div>

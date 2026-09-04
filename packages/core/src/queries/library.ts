@@ -44,7 +44,7 @@ export const getLibraryMaterialUrl = (
       return data!.signedUrl;
     });
 
-export type LibraryMaterialFilters = { subjectSlug?: string; groupId?: string };
+export type LibraryMaterialFilters = { departmentId?: string; groupId?: string };
 
 /** Все материалы библиотеки школы (v1 — вся школа, не только свой предмет),
  *  с классами (из junction-таблицы), именем+предметом загрузившего и
@@ -63,7 +63,7 @@ export async function getLibraryMaterials(
       "groups:teacher_library_material_groups(group:groups(id, name))",
     )
     .order("created_at", { ascending: false });
-  if (filters?.subjectSlug) q = q.eq("subject_slug", filters.subjectSlug);
+  if (filters?.departmentId) q = q.eq("department_id", filters.departmentId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -136,9 +136,13 @@ export type CreateLibraryMaterialInput = (
     }
 ) & {
   /**
-   * Предмет кафедры, выбранный автором. Не задан — берётся с карточки
-   * учителя, как было раньше. Общее поле для всех видов материала: предмет
-   * от вида не зависит.
+   * Кафедра, в которую кладём. Обязательна: право на материал считается
+   * только по ней (миграция 255), и без неё политика вставки откажет.
+   */
+  departmentId: string;
+  /**
+   * Предмет автора на момент загрузки — подпись, а не право. Не задан —
+   * берётся с карточки учителя, как было раньше.
    */
   subjectSlug?: string;
 };
@@ -196,10 +200,10 @@ export async function createLibraryMaterial(
    * физически: колонка subject_slug обязательна, класть в неё нечего.
    */
   const subjectSlug = input.subjectSlug ?? (teacher.subject_slug as string | null);
-  if (!subjectSlug) {
+  if (!input.departmentId) {
     throw new Error(
-      "У вашего предмета пока нет кафедры: он не заведён в справочнике предметов. "
-      + "Скажите администратору — он добавит, и загрузка появится.",
+      "Кафедра не выбрана: положить материал некуда. Если кафедр у вас нет вовсе, "
+      + "скажите администратору — он назначит вам предмет, и загрузка появится.",
     );
   }
 
@@ -207,6 +211,7 @@ export async function createLibraryMaterial(
     ? {
         uploaded_by: teacher.id,
         subject_slug: subjectSlug,
+        department_id: input.departmentId,
         title: input.title,
         content_type: input.contentType,
         external_url: input.externalUrl,
@@ -216,6 +221,7 @@ export async function createLibraryMaterial(
     ? {
         uploaded_by: teacher.id,
         subject_slug: subjectSlug,
+        department_id: input.departmentId,
         title: input.title,
         content_type: "video_mp4" as const,
         storage_path: input.storagePath,
@@ -224,6 +230,7 @@ export async function createLibraryMaterial(
     : {
         uploaded_by: teacher.id,
         subject_slug: subjectSlug,
+        department_id: input.departmentId,
         title: input.title,
         content_type: "file" as const,
         storage_path: input.storagePath,

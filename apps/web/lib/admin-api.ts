@@ -1183,14 +1183,40 @@ export async function createSchoolSubject(data: {
   name: string; icon: string; color: string; school_id: string;
 }): Promise<string> {
   const sb = getServiceClient();
+  // Кафедра обязательна (миграция 255: department_id NOT NULL). Экрана
+  // выбора кафедры пока нет, поэтому новому предмету заводится своя, с тем
+  // же именем — ровно так же, как при переезде. Кафедра с таким именем уже
+  // есть — прицепляемся к ней, а не плодим вторую: имя уникально в школе.
+  const departmentId = await ensureDepartment(sb, data.school_id, data.name);
   const { data: row, error } = await sb
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from("school_subjects" as any)
-    .insert({ name: data.name, icon: data.icon, color: data.color, school_id: data.school_id })
+    .insert({
+      name: data.name, icon: data.icon, color: data.color,
+      school_id: data.school_id, department_id: departmentId,
+    })
     .select("id")
     .single();
   if (error || !row) throw error ?? new Error("School subject insert failed");
   return (row as { id: string }).id;
+}
+
+/** Кафедра школы по имени: находит существующую или заводит новую. */
+async function ensureDepartment(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  schoolId: string,
+  name: string,
+): Promise<string> {
+  const { data: found } = await sb
+    .from("departments").select("id")
+    .eq("school_id", schoolId).eq("name", name).maybeSingle();
+  if (found) return (found as { id: string }).id;
+
+  const { data: created, error } = await sb
+    .from("departments").insert({ school_id: schoolId, name }).select("id").single();
+  if (error || !created) throw error ?? new Error("Department insert failed");
+  return (created as { id: string }).id;
 }
 
 /** Переименование/смена стиля. Назначения тянутся через catalog_id, поэтому
@@ -1394,8 +1420,16 @@ export async function deleteSubjectAssignment(
   if (error) throw error;
 }
 
-/** Что мешает удалить предмет из справочника школы. Z.2.3. */
-export type SchoolSubjectDeletionImpact = SubjectDeletionImpact & { assignments: number };
+/** Что мешает удалить предмет из справочника школы. Z.2.3.
+ *
+ *  materials — 05.09.2026, миграция 255: материалы кафедры этого предмета.
+ *  До кафедр их сюда посчитать было НЕЧЕМ: материал держался за слаг, а у
+ *  предмета справочника слага нет. Теперь связь прямая, и без этого числа
+ *  удаление предмета молча оставило бы кафедру с материалами без предмета. */
+export type SchoolSubjectDeletionImpact = SubjectDeletionImpact & {
+  assignments: number;
+  materials: number;
+};
 
 export async function getSchoolSubjectImpact(
   id: string,
@@ -1408,8 +1442,29 @@ export async function getSchoolSubjectImpact(
   const anySb = sb as any;
   const { data: rows } = await anySb.from("subjects").select("id").eq("catalog_id", id);
   const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
+
+  // Материалы кафедры этого предмета. Кафедра может держать несколько
+  // предметов — тогда её материалы мешают удалить каждый из них, и это
+  // правильно: удалив последний предмет, мы оставили бы кафедру без входа.
+  const { data: subjRow } = await anySb
+    .from("school_subjects").select("department_id").eq("id", id).maybeSingle();
+  const departmentId = (subjRow as { department_id: string | null } | null)?.department_id ?? null;
+  let materials = 0;
+  if (departmentId) {
+    const { count } = await anySb
+      .from("teacher_library_materials")
+      .select("id", { count: "exact", head: true })
+      .eq("department_id", departmentId);
+    materials = count ?? 0;
+  }
+
   const impact = await subjectImpact(anySb, ids);
-  return { ...impact, assignments: ids.length, blocked: impact.blocked || ids.length > 0 };
+  return {
+    ...impact,
+    assignments: ids.length,
+    materials,
+    blocked: impact.blocked || ids.length > 0 || materials > 0,
+  };
 }
 
 /**
@@ -1431,7 +1486,7 @@ export async function deleteSchoolSubject(
   const impact = await getSchoolSubjectImpact(id, callerSchoolId, callerIsSuperAdmin);
   if (impact.blocked) {
     throw new Error(
-      `BLOCKED_CATALOG_IN_USE:${impact.assignments}:${impact.lessons}:${impact.homework}:${impact.plans}`,
+      `BLOCKED_CATALOG_IN_USE:${impact.assignments}:${impact.lessons}:${impact.homework}:${impact.plans}:${impact.materials}`,
     );
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -80,7 +80,8 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
         .replace("{assignments}", String(num(0)))
         .replace("{lessons}", String(num(1)))
         .replace("{homework}", String(num(2)))
-        .replace("{plans}", String(num(3)));
+        .replace("{plans}", String(num(3)))
+        .replace("{materials}", String(num(4)));
     }
   }
 

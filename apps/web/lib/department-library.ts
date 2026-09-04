@@ -14,26 +14,26 @@
 // ═══ ЧТО ЗДЕСЬ ПРОВЕРЯЕТСЯ, А ЧТО НЕТ ══════════════════════════════════════
 //
 // Здесь НЕ решается, чья это кафедра. Это решает база — политика вставки
-// `teacher_library_materials` (миграции 190/191):
+// `teacher_library_materials` (миграция 255):
 //
 //     uploaded_by = current_teacher_id()
-//     AND subject_slug IS NOT NULL
-//     AND subject_slug IN (SELECT * FROM fn_my_subject_slugs())
+//     AND department_id IS NOT NULL
+//     AND department_id IN (SELECT id FROM fn_my_departments())
 //     AND school_id = current_school_id()
 //
-// Здесь только «есть ли мне куда класть»: пуст ли список моих предметов. И
-// список этот — РОВНО ТОТ ЖЕ, что смотрит база: `fn_my_subject_slugs()`.
+// Здесь только «есть ли мне куда класть»: пуст ли список моих кафедр. И
+// список этот — РОВНО ТОТ ЖЕ, что смотрит база: `fn_my_departments()`.
 //
 // ПОЧЕМУ НЕ КОЛОНКА КАРТОЧКИ. До 04.09.2026 обе точки входа спрашивали
-// `teachers.subject_slug` напрямую — и это было СТРОЖЕ базы: функция базы
-// умеет взять слаг у однопредметного коллеги по тому же предмету справочника,
-// а карточка про коллегу ничего не знает. Учитель с пустой карточкой, но с
-// правом по функции, видел отказ там, где база пустила бы.
+// `teachers.subject_slug` напрямую. Карточка заполняется первым назначением и
+// больше не меняется — она отвечает на вопрос «что человек ведёт» только у
+// однопредметного, а у остальных врёт. С 05.09.2026 её здесь нет вовсе:
+// кафедры считаются от назначений.
 
 /**
- * Есть ли учителю куда загружать материал: непустой список его предметов.
- * Список берётся из `fn_my_subject_slugs()` — того же, что и в правиле базы.
+ * Есть ли учителю куда загружать материал: непустой список его кафедр.
+ * Список берётся из `fn_my_departments()` — того же, что и в правиле базы.
  */
-export function canUploadToDepartment(subjectSlugs: string[] | null | undefined): boolean {
-  return !!subjectSlugs && subjectSlugs.length > 0;
+export function canUploadToDepartment(departments: { id: string }[] | null | undefined): boolean {
+  return !!departments && departments.length > 0;
 }

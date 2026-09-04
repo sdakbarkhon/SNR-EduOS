@@ -749,7 +749,7 @@ export const en: Dictionary = {
     gradeFromGroupUnknown: "—",
     catalogSubjectDeleteTitle: "Delete subject from the catalog",
     catalogSubjectDeleteClean: "The subject is not assigned anywhere — deletion is safe.",
-    catalogSubjectInUseHint: "The subject is assigned {assignments} times: {lessons} lessons, {homework} assignments, {plans} plans. It cannot be deleted — hide it instead.",
+    catalogSubjectInUseHint: "The subject is assigned {assignments} times: {lessons} lessons, {homework} assignments, {plans} plans, {materials} department materials. It cannot be deleted — hide it instead.",
     hideInsteadBtn: "Hide instead of deleting",
     groupsTitle: "Groups",
     addGroupTitle: "Create group",
@@ -1424,7 +1424,7 @@ export const en: Dictionary = {
     teacherHasLessons: "Cannot delete: the teacher runs {count} lessons. Hand the subjects over to someone else first.",
     teacherHasGrades: "Cannot delete: {count} grades and decisions are signed by this teacher and cannot be left without an author.",
     subjectInUse: "Cannot delete: {lessons} lessons, {homework} assignments, {plans} curriculum plans. Remove them or hide the subject.",
-    catalogSubjectInUse: "Cannot delete: the subject is assigned {assignments} times ({lessons} lessons, {homework} assignments, {plans} plans). You can hide it instead.",
+    catalogSubjectInUse: "Cannot delete: the subject is assigned {assignments} times ({lessons} lessons, {homework} assignments, {plans} plans, {materials} department materials). You can hide it instead.",
     genericPrefix: "Error: ",
   },
   parentUi: {
