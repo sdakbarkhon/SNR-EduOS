@@ -1042,6 +1042,8 @@ export type Grade = {
 };
 
 export type CourseMaterial = {
+  /** Миграция 257 — предмет материала строкой справочника школы. */
+  catalog_id?: string | null;
   id: string;
   group_id: string;
   lesson_id: string | null;
@@ -1064,7 +1066,11 @@ export type CourseMaterial = {
 };
 
 export type MaterialWithGroup = CourseMaterial & {
-  group: { name: string; subject: string };
+  group: { name: string };
+  /** Строка справочника предметов школы (course_materials.catalog_id,
+   *  миграция 257), если выборка её подтянула. Отсюда берутся подпись, значок
+   *  и цвет предмета — текстовая копия `subject` осталась запасным путём. */
+  catalog?: { name: string | null; icon: string | null; color: string | null } | null;
   /** Урок, на котором материал использовался (course_materials.lesson_id).
    *  null у записей, загруженных прямо в материалы группы — фильтр по датам
    *  их не теряет, см. apps/web/lib/material-filters.ts. Необязательное поле:

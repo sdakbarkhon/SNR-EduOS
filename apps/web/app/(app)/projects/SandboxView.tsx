@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ChevronLeft, Play, Loader2, Trash2, AlertTriangle, ExternalLink,
@@ -17,7 +17,7 @@ import { useLocale } from "@/components";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { SANDBOX_TOOLS, type SandboxTool, type SandboxToolId } from "@/lib/sandbox-tools";
-import { getServicesForSubject, SUBJECT_SERVICE_MAP } from "@/lib/external-services";
+import { servicesForSubject, type SubjectServices } from "@/lib/subject-services";
 import { ScratchSandbox } from "./scratch/ScratchSandbox";
 import { CodeEditor } from "@/components/CodeEditor";
 import { StdinInput } from "@/components/StdinInput";
@@ -540,7 +540,27 @@ function CodeSandbox() {
 }
 
 // ── Main sandbox grid ──────────────────────────────────────────────────────────
-export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId } = {}) {
+export function SandboxView({
+  initialToolId,
+  subjectServicesRaw,
+}: {
+  initialToolId?: SandboxToolId;
+  /** Наборы сервисов предметов школы (миграция 258). Пусто — все сервисы. */
+  subjectServicesRaw?: Record<string, string[]>;
+} = {}) {
+  // Карта собирается здесь: через границу сервер → клиент Map не переживает.
+  const subjectServices: SubjectServices = useMemo(
+    () => new Map(Object.entries(subjectServicesRaw ?? {})),
+    [subjectServicesRaw],
+  );
+  // Названия предметов школы — из тех же наборов. Ключей два вида (id и имя),
+  // берём только имена: они и показываются человеку.
+  const subjectNames = useMemo(
+    () => Object.keys(subjectServicesRaw ?? {})
+      .filter((k) => !/^[0-9a-f-]{36}$/i.test(k))
+      .sort((a, b) => a.localeCompare(b)),
+    [subjectServicesRaw],
+  );
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.sandbox;
@@ -559,13 +579,15 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
   // "code" (Python/C++ sandbox) counts as Программирование; "all" (default)
   // shows every tool, unchanged from before this filter existed.
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
-  const subjectOptions = Object.keys(SUBJECT_SERVICE_MAP);
+  // Список предметов — из справочника школы, а не из карты в коде: раньше
+  // ученик школы со «Схемотехникой» её здесь не находил вовсе.
+  const subjectOptions = subjectNames;
   // Фильтр по предмету касается только карточек, которые ЕСТЬ в справочнике
   // сервисов. «Код» — встроенный редактор, а три карточки Google отвечают
   // одному типу этапа (google_docs) и универсальны: они показываются всегда.
   // Сравниваем через множество строк, чтобы не приводить SandboxToolId к
   // ExternalServiceType — это разные перечисления, пересекающиеся лишь частью.
-  const allowedServices = new Set<string>(getServicesForSubject(subjectFilter));
+  const allowedServices = new Set<string>(servicesForSubject(subjectServices, subjectFilter));
   const ALWAYS_SHOWN: string[] = ["google_docs", "google_sheets", "google_slides"];
   const visibleTools = subjectFilter === "all"
     ? SANDBOX_TOOLS

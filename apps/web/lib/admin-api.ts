@@ -1183,6 +1183,9 @@ export type SchoolSubjectRow = {
 
 export async function createSchoolSubject(data: {
   name: string; icon: string; color: string; school_id: string;
+  /** Внешние сервисы предмета (миграция 258). Не переданы — колонка берёт
+   *  своё умолчание: все четырнадцать. */
+  services?: string[] | null;
   /** Кафедра, выбранная админом в форме. */
   department_id?: string | null;
   /** Или новая кафедра, названная тут же. */
@@ -1203,6 +1206,7 @@ export async function createSchoolSubject(data: {
     .insert({
       name: data.name, icon: data.icon, color: data.color,
       school_id: data.school_id, department_id: departmentId,
+      ...(data.services && data.services.length > 0 ? { services: data.services } : {}),
     })
     .select("id")
     .single();
@@ -1244,16 +1248,21 @@ async function ensureDepartment(
  *  синхроне, иначе списки назначений покажут старое имя. */
 export async function updateSchoolSubject(
   id: string,
-  data: { name: string; icon: string; color: string },
+  data: { name: string; icon: string; color: string; services?: string[] | null },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ) {
   const sb = getServiceClient();
   await assertSameSchool(sb, "school_subjects", id, callerSchoolId, callerIsSuperAdmin);
 
+  // Сервисы пишем, ТОЛЬКО если форма их прислала: молчание формы не должно
+  // обнулять набор — то же правило, что у цены группы и у куратора.
+  const патч: Record<string, unknown> = { name: data.name, icon: data.icon, color: data.color };
+  if (data.services) патч.services = data.services;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (sb as any)
-    .from("school_subjects").update(data).eq("id", id);
+    .from("school_subjects").update(патч).eq("id", id);
   if (error) throw error;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -565,6 +565,26 @@ export async function actionDeleteGroup(groupId: string, requestedSchoolId?: str
 // — до Z.2.2 эта форма была единственной в админке, писавшей прямо из браузера
 // и полагавшейся на DEFAULT current_school_id().
 
+/**
+ * Внешние сервисы предмета из формы (миграция 258).
+ *
+ * Поля нет вовсе — null, и запись не трогает колонку: у создания сработает
+ * умолчание (все четырнадцать), у правки набор останется прежним. Пустой
+ * список — это ОСОЗНАННЫЙ выбор «ни одного», и он должен доехать, поэтому
+ * отсутствие поля и пустой список — разные вещи.
+ */
+function readServices(formData: FormData): string[] | null {
+  const raw = formData.get("services");
+  if (raw === null) return null;
+  try {
+    const list = JSON.parse(String(raw));
+    if (!Array.isArray(list)) return null;
+    return list.map((v) => String(v));
+  } catch {
+    return null;
+  }
+}
+
 function revalidateSubjects() {
   revalidatePath("/admin/subjects");
   revalidatePath("/admin/subject-assignments");
@@ -589,6 +609,7 @@ export async function actionCreateSchoolSubject(formData: FormData) {
     const id = await createSchoolSubject({
       name, icon, color, school_id: schoolId,
       department_id: departmentId, department_name: departmentName,
+      services: readServices(formData),
     });
     revalidateSubjects();
     return id;
@@ -607,7 +628,7 @@ export async function actionUpdateSchoolSubject(formData: FormData) {
     const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
     const color = String(formData.get("color") ?? "").trim() || "#64748B";
     if (!id || !name) throw new Error("Missing fields");
-    await updateSchoolSubject(id, { name, icon, color }, schoolId, isSuperAdmin);
+    await updateSchoolSubject(id, { name, icon, color, services: readServices(formData) }, schoolId, isSuperAdmin);
     revalidateSubjects();
   });
 }

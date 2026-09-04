@@ -275,40 +275,20 @@ export const EXTERNAL_SERVICE_ORDER: ExternalServiceType[] = [
   "scratch", "google_docs",
 ];
 
-// БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — filters the 12-service picker by subject
+// 06.09.2026 — КАРТЫ «ПРЕДМЕТ → СЕРВИСЫ» ЗДЕСЬ БОЛЬШЕ НЕТ.
+//
+// Она ключевалась русским названием и знала пять имён; предмет, которого в
+// ней нет, получал четыре сервиса из четырнадцати. Теперь набор лежит у
+// предмета справочника (`school_subjects.services`, миграция 258) и задаётся
+// галочками — читает его lib/subject-services.ts.
+//
+// Прежняя запись (Этап 5.4) — filters the 12-service picker by subject
 // (lesson stage / homework / sandbox). Keyed by the Русский subjects.name
 // display string (Этап 2 subjects table), NOT the legacy groups.subject
 // slug — every group's groups.subject currently reads 'programming'
 // regardless of the group's actual subjects (a pre-existing artifact of
 // Этап 1's account rebuild, see resheniya.md), so slug-based filtering
 // would incorrectly show only Programming tools everywhere.
-export const SUBJECT_SERVICE_MAP: Record<string, ExternalServiceType[]> = {
-  "Программирование": ["codesandbox", "blockly_games", "visualgo", "p5js", "sqlonline"],
-  "Робототехника": ["wokwi", "blockly_games"],
-  "Математика": ["geogebra", "desmos"],
-  "Английский язык": ["learningapps"],
-  "Русский язык": ["learningapps"],
-};
-
-// Always offered regardless of subject (§5.3: "универсальные, можно
-// вставлять любому предмету где уместно"). typerun (Пачка 6.1) —
-// печать полезна на любом предмете, не привязана к конкретному.
-const UNIVERSAL_SERVICES: ExternalServiceType[] = ["excalidraw", "typerun", "google_docs"];
-// PhET is science-flavored (§5.3: "больше для естественных наук") — offered
-// for stub science subjects that have no dedicated mapping above, used
-// sparingly rather than added to every subject.
-const SCIENCE_STUB_SERVICES: ExternalServiceType[] = ["phet"];
-
-/** Services to offer for a given subject display name. Unknown/null subject
- *  (e.g. standalone homework not linked to a lesson) falls back to every
- *  service — never hides options the teacher might legitimately want. */
-export function getServicesForSubject(subjectName: string | null | undefined): ExternalServiceType[] {
-  if (!subjectName) return EXTERNAL_SERVICE_ORDER;
-  const mapped = SUBJECT_SERVICE_MAP[subjectName];
-  if (!mapped) return [...SCIENCE_STUB_SERVICES, ...UNIVERSAL_SERVICES];
-  return [...mapped, ...UNIVERSAL_SERVICES];
-}
-
 /**
  * Проверка «это внешний сервис».
  *

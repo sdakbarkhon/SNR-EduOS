@@ -535,6 +535,8 @@ export interface Dictionary {
     subjectsDepartment: string;
     subjectsDepartmentAuto: string;
     subjectsDepartmentNew: string;
+    subjectsServices: string;
+    subjectsServicesHint: string;
     navAssignments: string;
     navAnnouncements: string;
     navParents: string;

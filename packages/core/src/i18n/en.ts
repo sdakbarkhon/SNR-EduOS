@@ -771,6 +771,8 @@ export const en: Dictionary = {
     subjectsDepartment: "Department",
     subjectsDepartmentAuto: "Own department named after the subject",
     subjectsDepartmentNew: "New department…",
+    subjectsServices: "External services",
+    subjectsServicesHint: "What to offer a teacher of this subject. A new subject has everything ticked — untick what you do not need.",
     hideInsteadBtn: "Hide instead of deleting",
     groupsTitle: "Groups",
     addGroupTitle: "Create group",

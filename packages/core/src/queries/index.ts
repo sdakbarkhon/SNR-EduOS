@@ -781,7 +781,14 @@ export const getMaterials = (db: Db) =>
     // миграция 119) — не хватало только её в выборке. Эмбед необязательный
     // (без !inner): запись без урока, загруженная прямо в материалы группы,
     // остаётся в списке с lesson = null, а не выпадает из выборки.
-    .select("*, group:groups!inner(name, subject), lesson:lessons(id, title, topic, starts_at)")
+    .select(
+      // 06.09.2026 — вместе с материалом приходит строка справочника
+      // (catalog_id, миграция 257): подпись и цвет предмета берутся оттуда,
+      // а не из текстовой копии course_materials.subject. Колонка groups.subject
+      // из выборки убрана — она устарела (256) и никем здесь не читалась.
+      "*, group:groups!inner(name), catalog:school_subjects(name, icon, color), "
+      + "lesson:lessons(id, title, topic, starts_at)",
+    )
     .order("created_at", { ascending: false })
     .then(unwrap)
     .then((rows) => rows as unknown as import("../types").MaterialWithGroup[]);

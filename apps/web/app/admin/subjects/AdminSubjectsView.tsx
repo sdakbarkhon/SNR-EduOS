@@ -7,6 +7,7 @@ import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
 import { LUCIDE_ICONS, ICON_NAMES } from "@/lib/subject-icons";
+import { SERVICE_CONFIG, EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
 import {
@@ -32,6 +33,9 @@ export type CatalogRow = {
   color: string;
   is_active: boolean;
   assignments: number;
+  /** Внешние сервисы предмета (миграция 258). Пусто — набор ещё не задан,
+   *  форма покажет все отмеченными: так же ведёт себя и колонка. */
+  services?: string[];
 };
 
 type ModalState = { mode: "none" } | { mode: "add" } | { mode: "edit"; row: CatalogRow };
@@ -99,6 +103,17 @@ export function AdminSubjectsView({
   const [formIcon, setFormIcon] = useState("BookOpen");
   const [formColor, setFormColor] = useState("#64748B");
   const [formError, setFormError] = useState("");
+  /**
+   * ВНЕШНИЕ СЕРВИСЫ ПРЕДМЕТА. 06.09.2026, миграция 258.
+   *
+   * До неё список решала карта в коде по русскому названию: пять имён, и
+   * предмет вне карты получал четыре сервиса из четырнадцати. Теперь решает
+   * школа — галочками.
+   *
+   * У нового предмета отмечены ВСЕ. Список сужает человек осознанно: лишнюю
+   * галочку видно и снять её — одно движение, а недостающей не видно вовсе.
+   */
+  const [formServices, setFormServices] = useState<string[]>([...EXTERNAL_SERVICE_ORDER]);
   /** Кафедра нового предмета: id существующей, NEW_DEPARTMENT — завести тут
    *  же, пустая строка — не выбирал, кафедру заведёт сервер по названию
    *  предмета. Последнее и есть запасной путь: он остался ради того, чтобы
@@ -109,11 +124,17 @@ export function AdminSubjectsView({
   function openAdd() {
     setFormName(""); setFormIcon("BookOpen"); setFormColor("#64748B"); setFormError("");
     setFormDepartmentId(""); setFormDepartmentName("");
+    setFormServices([...EXTERNAL_SERVICE_ORDER]);
     setModal({ mode: "add" });
   }
 
   function openEdit(row: CatalogRow) {
     setFormName(row.name); setFormIcon(row.icon); setFormColor(row.color); setFormError("");
+    // Набора нет (миграция ещё не применена) — показываем все отмеченными:
+    // ровно то, что покажет и колонка со своим умолчанием.
+    setFormServices(row.services && row.services.length > 0
+      ? [...row.services]
+      : [...EXTERNAL_SERVICE_ORDER]);
     setModal({ mode: "edit", row });
   }
 
@@ -133,6 +154,7 @@ export function AdminSubjectsView({
     fd.set("name", formName.trim());
     fd.set("icon", formIcon);
     fd.set("color", formColor);
+    fd.set("services", JSON.stringify(formServices));
     if (modal.mode === "edit") fd.set("id", modal.row.id);
     if (modal.mode === "add") {
       if (formDepartmentId === NEW_DEPARTMENT) {
@@ -393,6 +415,40 @@ export function AdminSubjectsView({
                   <p className="mt-1 text-xs text-zinc-500">
                     {d.subjectsIconSelected.replace("{icon}", formIcon)}
                   </p>
+                </div>
+
+                {/* Внешние сервисы. Не «какие бывают», а «какие предлагать
+                    учителю этого предмета»: список сужает школа. */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsServices}</label>
+                  <p className="mb-2 text-xs text-zinc-500">{d.subjectsServicesHint}</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {EXTERNAL_SERVICE_ORDER.map((key) => {
+                      const on = formServices.includes(key);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setFormServices((prev) =>
+                            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key])}
+                          className={cn(
+                            "flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                            on
+                              ? "border-zinc-900 bg-zinc-900/5 font-medium text-zinc-900"
+                              : "border-zinc-200 text-zinc-500 hover:bg-zinc-50",
+                          )}
+                        >
+                          <span className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                            on ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300",
+                          )}>
+                            {on && <Check className="h-3 w-3" />}
+                          </span>
+                          {SERVICE_CONFIG[key].name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div>

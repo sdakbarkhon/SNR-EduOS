@@ -21,16 +21,39 @@ import { tashkentDayKey, formatTime } from "@snr/core";
 // в одном месте, packages/core/src/utils/date.ts.
 
 export type FilterableMaterial = {
+  /** Устаревшая текстовая копия названия предмета. Запасной путь. */
   subject: string | null;
+  /** Ссылка на справочник (миграция 257) — по ней и идёт отбор. */
+  catalog_id?: string | null;
+  /** Строка справочника, если выборка её подтянула: подпись предмета. */
+  catalog?: { name: string | null } | null;
   lesson?: { id: string; title: string | null; topic: string | null; starts_at: string } | null;
 };
+
+/**
+ * КЛЮЧ ОТБОРА ПО ПРЕДМЕТУ. 06.09.2026.
+ *
+ * Ссылка на справочник, а при её отсутствии — старый текст. Отбор по ссылке
+ * переживает переименование предмета: школа сменила «Английский язык» на
+ * «Английский», и двести двадцать шесть строк со старым словом никуда не
+ * делись — а раньше список фильтра распался бы на два пункта.
+ */
+export function materialSubjectKey(m: FilterableMaterial): string {
+  return m.catalog_id ?? m.subject ?? "";
+}
+
+/** Подпись предмета материала: справочник первым, старый текст запасным. */
+export function materialSubjectLabel(m: FilterableMaterial): string {
+  const изСправочника = (m.catalog?.name ?? "").trim();
+  return изСправочника || (m.subject ?? "").trim() || "—";
+}
 
 export type MaterialFilters = {
   /** YYYY-MM-DD ташкентской даты урока, либо "all". */
   date: string;
   /** lessons.id, либо "all". */
   lesson: string;
-  /** course_materials.subject, либо "all". */
+  /** Ключ предмета (materialSubjectKey), либо "all". */
   subject: string;
 };
 
@@ -54,7 +77,7 @@ export function lessonLabel(m: FilterableMaterial): string {
   if (!l) return "";
   const name = l.title ?? l.topic ?? "";
   const time = formatTime(l.starts_at);
-  const subj = m.subject ? ` · ${m.subject}` : "";
+  const subj = m.catalog?.name || m.subject ? ` · ${materialSubjectLabel(m)}` : "";
   return name ? `${time} — ${name}${subj}` : `${time}${subj}`;
 }
 
@@ -63,7 +86,8 @@ export type FilterOptions = {
   dates: Array<{ key: string; label: string; count: number }>;
   /** Уроки — суженные выбранной датой, если она выбрана. */
   lessons: Array<{ id: string; label: string; count: number }>;
-  subjects: string[];
+  /** Пункты отбора по предмету: ключ — ссылка на справочник, подпись — его имя. */
+  subjects: Array<{ key: string; label: string }>;
   /** Есть ли записи без привязки к уроку — от этого зависит, показывать ли
    *  отдельный пункт «Общие материалы». */
   hasUnlinked: boolean;
@@ -80,7 +104,7 @@ export function buildFilterOptions(
 ): FilterOptions {
   const dateCounts = new Map<string, number>();
   const lessonCounts = new Map<string, { label: string; count: number }>();
-  const subjects = new Set<string>();
+  const subjects = new Map<string, string>();
   let hasUnlinked = false;
 
   for (const m of materials) {
@@ -88,7 +112,8 @@ export function buildFilterOptions(
     if (day) dateCounts.set(day, (dateCounts.get(day) ?? 0) + 1);
     else hasUnlinked = true;
 
-    if (m.subject) subjects.add(m.subject);
+    const ключ = materialSubjectKey(m);
+    if (ключ) subjects.set(ключ, materialSubjectLabel(m));
 
     if (m.lesson && (selectedDate === "all" || day === selectedDate)) {
       const prev = lessonCounts.get(m.lesson.id);
@@ -106,7 +131,8 @@ export function buildFilterOptions(
     lessons: Array.from(lessonCounts.entries())
       .map(([id, v]) => ({ id, label: v.label, count: v.count }))
       .sort((a, b) => a.label.localeCompare(b.label)),
-    subjects: Array.from(subjects).sort((a, b) => a.localeCompare(b)),
+    subjects: Array.from(subjects, ([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
     hasUnlinked,
   };
 }
@@ -119,7 +145,7 @@ export function buildFilterOptions(
  * всегда — иначе загруженные вручную файлы молча исчезли бы из списка.
  */
 export function matchesFilters(m: FilterableMaterial, f: MaterialFilters): boolean {
-  if (f.subject !== "all" && m.subject !== f.subject) return false;
+  if (f.subject !== "all" && materialSubjectKey(m) !== f.subject) return false;
   if (f.date !== "all" && lessonDayKey(m) !== f.date) return false;
   if (f.lesson !== "all" && m.lesson?.id !== f.lesson) return false;
   return true;

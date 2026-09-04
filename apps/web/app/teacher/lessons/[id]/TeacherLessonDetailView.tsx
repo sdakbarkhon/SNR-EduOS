@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -28,7 +28,8 @@ import type {
   CodeLanguage, CodeStageConfig, ExternalServiceConfig, ExternalServiceType,
   QuizQuestionInput, QuizConfigForStage, CodeCompletionPayload, CodeCompletionGap,
 } from "@snr/core";
-import { SERVICE_CONFIG, validateServiceUrl, isExternalService, getServicesForSubject } from "@/lib/external-services";
+import { SERVICE_CONFIG, validateServiceUrl, isExternalService } from "@/lib/external-services";
+import { servicesForSubject, type SubjectServices } from "@/lib/subject-services";
 import { isJuniorGroup } from "@/lib/group-grade";
 import { uploadVideoFile } from "@/lib/video-storage";
 import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
@@ -139,6 +140,7 @@ function StageModal({
   groupSubject,
   groupName,
   subjectName,
+  subjectServices,
   teacherId,
 }: {
   modalState: Extract<StageModalState, { mode: "add" | "edit" }>;
@@ -162,6 +164,8 @@ function StageModal({
   groupSubject: string;
   groupName: string | null;
   subjectName: string | null;
+  /** Наборы сервисов предметов школы (миграция 258). */
+  subjectServices: SubjectServices;
   teacherId: string;
 }) {
   const { locale } = useLocale();
@@ -281,7 +285,8 @@ function StageModal({
 
   // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — external-service options filtered by the
   // lesson's subject (code/quiz types are never subject-restricted).
-  const allowedServices = new Set(getServicesForSubject(subjectName));
+  // Набор — из справочника школы (миграция 258), по названию предмета урока.
+  const allowedServices = new Set(servicesForSubject(subjectServices, subjectName));
   const rawContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
   // 08.08.2026 — Scratch как ТИП ЭТАПА только для младших классов (1-5),
   // решение заказчика. Класс берём из названия группы: колонки с номером
@@ -768,6 +773,7 @@ export function TeacherLessonDetailView({
   lesson,
   teacher,
   autostartEnabled = false,
+  subjectServicesRaw,
 }: {
   lesson: TeacherLessonView;
   teacher: Teacher;
@@ -778,6 +784,8 @@ export function TeacherLessonDetailView({
    *  «Закончить» учителю не нужны — они только сбивают с толку. В школе с
    *  выключенным автозапуском кнопки остаются: там их нечем заменить. */
   autostartEnabled?: boolean;
+  /** Наборы сервисов предметов школы (миграция 258). Пусто — все сервисы. */
+  subjectServicesRaw?: Record<string, string[]>;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -791,6 +799,11 @@ export function TeacherLessonDetailView({
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
   const [activatingStageId, setActivatingStageId] = useState<string | null>(null);
   const [stageActivationError, setStageActivationError] = useState<string | null>(null);
+  // Карта собирается здесь: через границу сервер → клиент Map не переживает.
+  const subjectServices: SubjectServices = useMemo(
+    () => new Map(Object.entries(subjectServicesRaw ?? {})),
+    [subjectServicesRaw],
+  );
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
   const [viewStage, setViewStage] = useState<LessonStage | null>(null);
   // Какие этапы раскрыты врезкой. Множество, а не один id: между активациями
@@ -2181,6 +2194,7 @@ export function TeacherLessonDetailView({
           groupSubject={lesson.group.subject}
           groupName={lesson.group.name}
           subjectName={lesson.subjectName}
+          subjectServices={subjectServices}
           teacherId={teacher.id}
         />
       )}

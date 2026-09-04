@@ -36,9 +36,12 @@ function internalProjectIcon(title: string): LucideIcon {
 export function ProjectsView({
   projects,
   className,
+  subjectServicesRaw,
 }: {
   projects: StudentProjectListItem[];
   className: string;
+  /** Наборы сервисов предметов школы (миграция 258). Пусто — все сервисы. */
+  subjectServicesRaw?: Record<string, string[]>;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -93,7 +96,7 @@ export function ProjectsView({
         ))}
       </div>
 
-      {mode === "sandbox" && <div className="mt-6"><SandboxView initialToolId={initialTool} /></div>}
+      {mode === "sandbox" && <div className="mt-6"><SandboxView initialToolId={initialTool} subjectServicesRaw={subjectServicesRaw} /></div>}
 
       {mode === "projects" && (
         <>

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTeacherGroups } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
+import { loadSubjectServices } from "@/lib/subject-services";
 import { CreateHomeworkForm } from "./CreateHomeworkForm";
 
 export default async function NewHomeworkPage() {
@@ -49,6 +50,7 @@ export default async function NewHomeworkPage() {
       groups={groups as never[]}
       subjects={subjects ?? []}
       teacherId={teacher?.id ?? ""}
+      subjectServicesRaw={Object.fromEntries(await loadSubjectServices(supabase))}
     />
   );
 }

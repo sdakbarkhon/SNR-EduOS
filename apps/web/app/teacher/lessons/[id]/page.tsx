@@ -3,6 +3,7 @@ import { getTeacherLessonView } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { notFound, redirect } from "next/navigation";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
+import { loadSubjectServices } from "@/lib/subject-services";
 import { TeacherLessonDetailView } from "./TeacherLessonDetailView";
 
 export default async function TeacherLessonDetailPage({
@@ -46,6 +47,7 @@ export default async function TeacherLessonDetailPage({
       lesson={lesson}
       teacher={teacher}
       autostartEnabled={autostart}
+      subjectServicesRaw={Object.fromEntries(await loadSubjectServices(db))}
     />
   );
 }

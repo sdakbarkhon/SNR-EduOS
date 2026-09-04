@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   getDictionary,
@@ -30,7 +30,8 @@ import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGen
 import { EduOSAssistantIcon } from "@/components/EduOSAssistantIcon";
 import { CodeEditor } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
-import { SERVICE_CONFIG, isExternalService, validateServiceUrl, EXTERNAL_SERVICE_ORDER, getServicesForSubject } from "@/lib/external-services";
+import { SERVICE_CONFIG, isExternalService, validateServiceUrl, EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
+import { servicesForSubject, type SubjectServices } from "@/lib/subject-services";
 import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS, isHtmlLanguage } from "@/lib/code-languages";
 
 type Format = ContentType;
@@ -43,6 +44,8 @@ interface Subtask { type: HomeworkSubtaskType; title: string; description: strin
 interface Props {
   groups: Array<{ id: string; name: string; subject: string }>;
   subjects: SubjectWithGroup[];
+  /** Наборы сервисов предметов школы (миграция 258). Пусто — все сервисы. */
+  subjectServicesRaw?: Record<string, string[]>;
   teacherId: string;
 }
 
@@ -56,7 +59,7 @@ interface Props {
  */
 const TEST_DURATION_MAX_MIN = 180;
 
-export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
+export function CreateHomeworkForm({ groups, subjects, teacherId, subjectServicesRaw }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const router = useRouter();
@@ -413,7 +416,18 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   const selectedSubjectName = subjects.find((s) => s.id === subjectId)?.name
     ?? lessonsForGroup.find((l) => l.id === lessonId)?.subjectName
     ?? null;
-  const allowedServiceOrder = EXTERNAL_SERVICE_ORDER.filter((key) => getServicesForSubject(selectedSubjectName).includes(key));
+  // Карта собирается здесь: через границу сервер → клиент Map не переживает.
+  const subjectServices: SubjectServices = useMemo(
+    () => new Map(Object.entries(subjectServicesRaw ?? {})),
+    [subjectServicesRaw],
+  );
+
+  // Набор — из справочника школы (миграция 258). Ключ ищем по строке
+  // справочника, а если экран её не знает — по названию предмета.
+  const allowedServiceOrder = servicesForSubject(
+    subjectServices,
+    subjects.find((s) => s.id === subjectId)?.catalog_id ?? selectedSubjectName,
+  );
 
   /**
    * ПРЕДМЕТ ВЫБИРАЕТСЯ САМ, КОГДА ОН У КЛАССА ОДИН. 03.09.2026.

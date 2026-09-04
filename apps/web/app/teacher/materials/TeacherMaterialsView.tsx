@@ -734,13 +734,9 @@ export function TeacherMaterialsView({
     };
   }, [menuOpenId]);
 
-  const subjects = useMemo(() => {
-    // 26.08.2026: запасной путь на m.group.subject убран. Он подмешивал в
-    // список фильтра лишний пункт «Программирование», не относящийся ни к
-    // какому предмету: у самой записи материала предмет заполнен всегда.
-    const set = new Set(materials.map((m) => m.subject).filter(Boolean));
-    return Array.from(set) as string[];
-  }, [materials]);
+  // 06.09.2026 — пункты отбора считает общий модуль: ключ — ссылка на
+  // справочник (миграция 257), подпись — его название.
+  const subjects = useMemo(() => buildFilterOptions(materials, "all").subjects, [materials]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -1001,7 +997,7 @@ export function TeacherMaterialsView({
             >
               <option value="all">Все предметы</option>
               {subjects.map((s) => (
-                <option key={s} value={s}>{resolveSubject({ slug: s }).label}</option>
+                <option key={s.key} value={s.key}>{s.label}</option>
               ))}
             </select>
             <ChevronDown className={`${FILTER_CHEVRON} ${filterSubject !== "all" ? "text-blue-400" : "text-slate-400"}`} />

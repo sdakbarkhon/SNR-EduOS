@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadSubjectsPage } from "@/lib/study-data";
 import { verifyStaff } from "@/lib/verify-staff";
 import { listDepartments } from "@/lib/admin-api";
+import { loadSubjectServices } from "@/lib/subject-services";
 import { AdminSubjectsView } from "./AdminSubjectsView";
 
 /**
@@ -15,9 +16,13 @@ import { AdminSubjectsView } from "./AdminSubjectsView";
 export default async function AdminSubjectsPage() {
   const supabase = await createClient();
   const { schoolId } = await verifyStaff();
-  const [rows, departments] = await Promise.all([
+  // Наборы сервисов — отдельной выборкой: пока миграция 258 не применена,
+  // колонки нет, и вплетённое поле уронило бы весь список предметов.
+  const [rows, departments, services] = await Promise.all([
     loadSubjectsPage(supabase),
     listDepartments(schoolId),
+    loadSubjectServices(supabase),
   ]);
-  return <AdminSubjectsView subjects={rows} departments={departments} />;
+  const withServices = rows.map((r) => ({ ...r, services: services.get(r.id) }));
+  return <AdminSubjectsView subjects={withServices} departments={departments} />;
 }

@@ -773,6 +773,8 @@ export const ru: Dictionary = {
     subjectsDepartment: "Кафедра",
     subjectsDepartmentAuto: "Своя кафедра по названию предмета",
     subjectsDepartmentNew: "Новая кафедра…",
+    subjectsServices: "Внешние сервисы",
+    subjectsServicesHint: "Что предлагать учителю этого предмета. У нового предмета отмечено всё — снимите лишнее.",
     hideInsteadBtn: "Скрыть вместо удаления",
     groupsTitle: "Группы",
     addGroupTitle: "Создать группу",

@@ -771,6 +771,8 @@ export const uz: Dictionary = {
     subjectsDepartment: "Kafedra",
     subjectsDepartmentAuto: "Fan nomi bo'yicha o'z kafedrasi",
     subjectsDepartmentNew: "Yangi kafedra…",
+    subjectsServices: "Tashqi xizmatlar",
+    subjectsServicesHint: "Bu fan o'qituvchisiga nimani taklif qilish. Yangi fanda hammasi belgilangan — keraksizini olib tashlang.",
     hideInsteadBtn: "O'chirish o'rniga yashirish",
     groupsTitle: "Guruhlar",
     addGroupTitle: "Guruh yaratish",

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { resolveSubject, getDictionary, type Locale, type MaterialWithGroup, type LessonSlide, subjectLabelOf, subjectDisplay } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
-import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
+import { buildFilterOptions, matchesFilters, groupByDay, materialSubjectLabel } from "@/lib/material-filters";
 import {
   filterSelectClass, withCount, FILTER_ICON, FILTER_CHEVRON, FILTER_RESET,
 } from "@/components/material-filter-styles";
@@ -114,11 +114,10 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
     [materials],
   );
 
-  const subjects = useMemo(() => {
-    // 07.08.2026: источник — предмет САМОЙ записи, а не единое поле группы.
-    const set = new Set(decorated.map((m) => m.subject).filter(Boolean));
-    return Array.from(set) as string[];
-  }, [decorated]);
+  // 06.09.2026 — пункты отбора считает общий модуль: ключ — ссылка на
+  // справочник (миграция 257), подпись — его название. Так отбор переживает
+  // переименование предмета, а список у ученика и у учителя один и тот же.
+  const subjects = useMemo(() => buildFilterOptions(decorated, "all").subjects, [decorated]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -332,7 +331,7 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
             >
               <option value="all">Все предметы</option>
               {subjects.map((s) => (
-                <option key={s} value={s}>{resolveSubject({ slug: s }).label}</option>
+                <option key={s.key} value={s.key}>{s.label}</option>
               ))}
             </select>
             <ChevronDown className={`${FILTER_CHEVRON} ${filterSubject !== "all" ? "text-blue-400" : "text-slate-400"}`} />
@@ -454,7 +453,7 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
                     {/* 26.08.2026: было mat.group.subject — заглушка группы,
                         из-за которой у каждого материала стояло
                         «programming». У самой записи предмет верный. */}
-                    {subjectDisplay(mat.subject)} · {TYPE_LABEL[mat._type]}
+                    {materialSubjectLabel(mat)} · {TYPE_LABEL[mat._type]}
                     {mat.file_size_bytes ? ` · ${formatSize(mat.file_size_bytes)}` : ""}
                   </div>
                   <div className="whitespace-nowrap text-[10px] text-slate-400">
