@@ -75,6 +75,11 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
         .replace("{homework}", String(num(1)))
         .replace("{plans}", String(num(2)));
     }
+    if (kind === "DEPARTMENT_IN_USE") {
+      return t.departmentInUse
+        .replace("{subjects}", String(num(0)))
+        .replace("{materials}", String(num(1)));
+    }
     if (kind === "CATALOG_IN_USE") {
       return t.catalogSubjectInUse
         .replace("{assignments}", String(num(0)))
@@ -84,6 +89,10 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
         .replace("{materials}", String(num(4)));
     }
   }
+
+  // Кафедра: имя уникально в школе (departments_name_unique). Проверка
+  // делается кодом ДО записи, поэтому сюда приходит свой код, а не 23505.
+  if (/DEPARTMENT_NAME_TAKEN/.test(raw)) return t.departmentNameTaken;
 
   // Миграция 213 — логин уникален во всей системе, почта привязана к одному
   // человеку. Обе проверки живут в базе (индексы плюс триггер между

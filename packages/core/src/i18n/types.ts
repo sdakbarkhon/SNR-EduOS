@@ -514,6 +514,26 @@ export interface Dictionary {
     navTeachers: string;
     navGroups: string;
     navSubjects: string;
+    navDepartments: string;
+    departmentsTitle: string;
+    departmentsSubtitle: string;
+    departmentsAdd: string;
+    departmentsEdit: string;
+    departmentsName: string;
+    departmentsEnterName: string;
+    departmentsEmpty: string;
+    departmentsSubjectsCount: string;   // "{count}"
+    departmentsMaterialsCount: string;  // "{count}"
+    departmentsMerge: string;
+    departmentsMergeInto: string;       // "{name}"
+    departmentsMergeHint: string;
+    departmentsMergeConfirm: string;    // "{from} {to} {subjects} {materials}"
+    departmentsPickTarget: string;
+    departmentsDelete: string;
+    departmentsDeleteConfirm: string;   // "{name}"
+    subjectsDepartment: string;
+    subjectsDepartmentAuto: string;
+    subjectsDepartmentNew: string;
     navAssignments: string;
     navAnnouncements: string;
     navParents: string;
@@ -1100,6 +1120,9 @@ export interface Dictionary {
     svTabTeachers: string;
     svTabParents: string;
     svTabSubjects: string;
+    svTabDepartments: string;
+    svColSubjects: string;
+    svColMaterials: string;
     svTabAssignments: string;
     svTabMarks: string;
     svTabAnnouncements: string;
@@ -1454,6 +1477,8 @@ export interface Dictionary {
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"
     catalogSubjectInUse: string;    // "{assignments} {lessons} {homework} {plans} {materials}"
+    departmentInUse: string;        // "{subjects} {materials}"
+    departmentNameTaken: string;
     genericPrefix: string;   // "Ошибка: "
   };
   parentUi: {

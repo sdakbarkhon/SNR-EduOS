@@ -50,6 +50,8 @@ function SubjectGlyph({ name, size = 18, className }: { name: string; size?: num
 const KNOWN_SUBJECT_NAMES = Object.values(SUBJECT_CONFIG).map((s) => s.label);
 /** Служебное значение пункта «своё название» — им не может быть настоящее имя. */
 const CUSTOM_NAME = "__custom__";
+/** Служебное значение пункта «завести кафедру тут же». */
+const NEW_DEPARTMENT = "__new__";
 
 // 04.09.2026 — список берётся из реестра, а не пишется рядом с ним. Пока он
 // был своим, админу предлагали значки, которых приложение не умело рисовать:
@@ -64,6 +66,7 @@ const COLOR_OPTIONS = [
 
 export function AdminSubjectsView({
   subjects,
+  departments = [],
   /**
    * Школа, в которой идёт работа. Срез 3c, роль менеджера.
    *
@@ -76,6 +79,8 @@ export function AdminSubjectsView({
   schoolId,
 }: {
   subjects: CatalogRow[];
+  /** Кафедры школы для выбора при создании предмета (миграция 255). */
+  departments?: Array<{ id: string; name: string }>;
   schoolId?: string;
 }) {
   /** Дописать школу в форму. Без неё форма остаётся прежней. */
@@ -94,9 +99,16 @@ export function AdminSubjectsView({
   const [formIcon, setFormIcon] = useState("BookOpen");
   const [formColor, setFormColor] = useState("#64748B");
   const [formError, setFormError] = useState("");
+  /** Кафедра нового предмета: id существующей, NEW_DEPARTMENT — завести тут
+   *  же, пустая строка — не выбирал, кафедру заведёт сервер по названию
+   *  предмета. Последнее и есть запасной путь: он остался ради того, чтобы
+   *  предмет нельзя было создать вообще без кафедры. */
+  const [formDepartmentId, setFormDepartmentId] = useState("");
+  const [formDepartmentName, setFormDepartmentName] = useState("");
 
   function openAdd() {
     setFormName(""); setFormIcon("BookOpen"); setFormColor("#64748B"); setFormError("");
+    setFormDepartmentId(""); setFormDepartmentName("");
     setModal({ mode: "add" });
   }
 
@@ -122,6 +134,15 @@ export function AdminSubjectsView({
     fd.set("icon", formIcon);
     fd.set("color", formColor);
     if (modal.mode === "edit") fd.set("id", modal.row.id);
+    if (modal.mode === "add") {
+      if (formDepartmentId === NEW_DEPARTMENT) {
+        const имя = formDepartmentName.trim();
+        if (!имя) { setFormError(d.departmentsEnterName); return; }
+        fd.set("department_name", имя);
+      } else if (formDepartmentId) {
+        fd.set("department_id", formDepartmentId);
+      }
+    }
 
     startTransition(async () => {
       try {
@@ -321,6 +342,34 @@ export function AdminSubjectsView({
                     </>
                   )}
                 </div>
+
+                {/* Кафедра. Только при создании: перевод существующего
+                    предмета на другую кафедру — это слияние, и делается оно на
+                    своём экране, где видно, что переедет. */}
+                {modal.mode === "add" && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsDepartment}</label>
+                    <select
+                      value={formDepartmentId}
+                      onChange={(e) => setFormDepartmentId(e.target.value)}
+                      className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+                    >
+                      <option value="">{d.subjectsDepartmentAuto}</option>
+                      {departments.map((dep) => (
+                        <option key={dep.id} value={dep.id}>{dep.name}</option>
+                      ))}
+                      <option value={NEW_DEPARTMENT}>{d.subjectsDepartmentNew}</option>
+                    </select>
+                    {formDepartmentId === NEW_DEPARTMENT && (
+                      <input
+                        value={formDepartmentName}
+                        onChange={(e) => setFormDepartmentName(e.target.value)}
+                        placeholder={d.departmentsName}
+                        className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+                      />
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsIcon}</label>

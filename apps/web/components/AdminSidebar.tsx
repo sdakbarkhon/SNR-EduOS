@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, Settings,
   LogOut, PanelLeftClose, PanelLeftOpen, Megaphone, Library, Heart, MessagesSquare,
   LifeBuoy,
-  Layers, ClipboardCheck, BarChart3, Sparkles, Wallet } from "lucide-react";
+  Layers, ClipboardCheck, BarChart3, Sparkles, Wallet, Building2 } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -58,6 +58,8 @@ export function AdminSidebar() {
     { key: "groups",         href: "/admin/groups",         icon: BookOpen,   label: da.navGroups },
     // Z.2.2: справочник и назначения — разные экраны
     { key: "subjects",       href: "/admin/subjects",       icon: Library,    label: da.navSubjects },
+    // Кафедра держит библиотеку материалов; предмет к ней привязан (255).
+    { key: "departments",    href: "/admin/departments",    icon: Building2,  label: da.navDepartments },
     { key: "assignments",    href: "/admin/subject-assignments", icon: Layers, label: da.navAssignments },
     // Замок 15 минут: правка того, что учитель уже не может изменить сам.
     { key: "marks",          href: "/admin/marks",          icon: ClipboardCheck, label: da.navMarks },

@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { loadSubjectsPage } from "@/lib/study-data";
+import { verifyStaff } from "@/lib/verify-staff";
+import { listDepartments } from "@/lib/admin-api";
 import { AdminSubjectsView } from "./AdminSubjectsView";
 
 /**
@@ -12,6 +14,10 @@ import { AdminSubjectsView } from "./AdminSubjectsView";
  */
 export default async function AdminSubjectsPage() {
   const supabase = await createClient();
-  const rows = await loadSubjectsPage(supabase);
-  return <AdminSubjectsView subjects={rows} />;
+  const { schoolId } = await verifyStaff();
+  const [rows, departments] = await Promise.all([
+    loadSubjectsPage(supabase),
+    listDepartments(schoolId),
+  ]);
+  return <AdminSubjectsView subjects={rows} departments={departments} />;
 }

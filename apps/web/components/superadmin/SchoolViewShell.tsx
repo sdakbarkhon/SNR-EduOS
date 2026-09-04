@@ -41,6 +41,7 @@ const ВКЛАДКИ = [
   { seg: "teachers", key: "svTabTeachers" },
   { seg: "parents", key: "svTabParents" },
   { seg: "subjects", key: "svTabSubjects" },
+  { seg: "departments", key: "svTabDepartments" },
   { seg: "assignments", key: "svTabAssignments" },
   { seg: "marks", key: "svTabMarks" },
   { seg: "announcements", key: "svTabAnnouncements" },

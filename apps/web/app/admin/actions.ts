@@ -6,6 +6,8 @@ import {
   createGroup, updateGroup, deleteGroup, createGroupsBulk,
   quickStartGroup, getQuickStartData,
   createSchoolSubject, updateSchoolSubject, setSchoolSubjectActive,
+  createDepartment, renameDepartment, getDepartmentImpact,
+  mergeDepartments, deleteDepartment, type DepartmentImpact,
   createSubjectAssignment, updateSubjectAssignment, deleteSubjectAssignment,
   deleteSchoolSubject, getSchoolSubjectImpact, getSubjectAssignmentImpact,
   getTeacherDeletionImpact, setAssignmentTeacher, topUpStudentBalance,
@@ -580,7 +582,14 @@ export async function actionCreateSchoolSubject(formData: FormData) {
     const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
     const color = String(formData.get("color") ?? "").trim() || "#64748B";
     if (!name) throw new Error("Missing fields");
-    const id = await createSchoolSubject({ name, icon, color, school_id: schoolId });
+    // Кафедра: выбранная в списке либо названная тут же. Не пришло ничего —
+    // createSchoolSubject заведёт кафедру по названию предмета (запасной путь).
+    const departmentId = String(formData.get("department_id") ?? "").trim() || null;
+    const departmentName = String(formData.get("department_name") ?? "").trim() || null;
+    const id = await createSchoolSubject({
+      name, icon, color, school_id: schoolId,
+      department_id: departmentId, department_name: departmentName,
+    });
     revalidateSubjects();
     return id;
   });
@@ -751,5 +760,71 @@ export async function actionDeleteSubjectAssignment(id: string, requestedSchoolI
     const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await deleteSubjectAssignment(id, schoolId, isSuperAdmin);
     revalidateSubjects();
+  });
+}
+
+// ── КАФЕДРЫ (миграция 255) ───────────────────────────────────────────────────
+// Школа — из verifyAdmin, как у справочника предметов: у админа своя, у
+// менеджера приходит снаружи и проверяется. Суперадмин без строки админа сюда
+// не проходит вовсе — его экран школы читающий, как и по предметам.
+
+function revalidateDepartments() {
+  revalidatePath("/admin/departments");
+  revalidatePath("/admin/subjects");
+}
+
+export async function actionCreateDepartment(name: string, requestedSchoolId?: string | null) {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin(requestedSchoolId);
+    const чистое = name.trim();
+    if (!чистое) throw new Error("Missing fields");
+    const id = await createDepartment(чистое, schoolId);
+    revalidateDepartments();
+    return id;
+  });
+}
+
+export async function actionRenameDepartment(id: string, name: string, requestedSchoolId?: string | null) {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
+    const чистое = name.trim();
+    if (!id || !чистое) throw new Error("Missing fields");
+    await renameDepartment(id, чистое, schoolId, isSuperAdmin);
+    revalidateDepartments();
+  });
+}
+
+/** Что держит кафедру. Питает два диалога: «что переедет при слиянии» и
+ *  «что мешает удалить». Числа спрашиваются заново перед каждым действием —
+ *  счётчик на карточке мог устареть, пока админ смотрел на список. */
+export async function actionDepartmentImpact(
+  id: string,
+  requestedSchoolId?: string | null,
+): Promise<ActionResult<DepartmentImpact>> {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
+    return getDepartmentImpact(id, schoolId, isSuperAdmin);
+  });
+}
+
+export async function actionMergeDepartments(
+  fromId: string,
+  toId: string,
+  requestedSchoolId?: string | null,
+) {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
+    const итог = await mergeDepartments(fromId, toId, schoolId, isSuperAdmin);
+    revalidateDepartments();
+    revalidatePath("/teacher/knowledge-base");
+    return итог;
+  });
+}
+
+export async function actionDeleteDepartment(id: string, requestedSchoolId?: string | null) {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
+    await deleteDepartment(id, schoolId, isSuperAdmin);
+    revalidateDepartments();
   });
 }

@@ -31,7 +31,7 @@ async function assertSameSchool(
   // school_id, поэтому проверка та же; as any на .from() нужен только потому,
   // что school_subjects (миграция 171) ещё нет в сгенерированном Database-типе
   // — он намеренно не перегенерирован, см. resheniya_2.md Z.2.1.
-  table: "students" | "teachers" | "groups" | "parents" | "school_subjects" | "subjects",
+  table: "students" | "teachers" | "groups" | "parents" | "school_subjects" | "subjects" | "departments",
   targetId: string,
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
@@ -1181,13 +1181,20 @@ export type SchoolSubjectRow = {
 
 export async function createSchoolSubject(data: {
   name: string; icon: string; color: string; school_id: string;
+  /** Кафедра, выбранная админом в форме. */
+  department_id?: string | null;
+  /** Или новая кафедра, названная тут же. */
+  department_name?: string | null;
 }): Promise<string> {
   const sb = getServiceClient();
-  // Кафедра обязательна (миграция 255: department_id NOT NULL). Экрана
-  // выбора кафедры пока нет, поэтому новому предмету заводится своя, с тем
-  // же именем — ровно так же, как при переезде. Кафедра с таким именем уже
-  // есть — прицепляемся к ней, а не плодим вторую: имя уникально в школе.
-  const departmentId = await ensureDepartment(sb, data.school_id, data.name);
+  // Кафедра обязательна (миграция 255: department_id NOT NULL). Порядок:
+  // выбранная в форме → названная тут же → своя по названию предмета.
+  // Последнее — запасной путь, а не основной: он остался ради вызовов,
+  // которые кафедру не спрашивают (быстрый старт), и ради того, чтобы
+  // предмет нельзя было создать без кафедры вообще никак.
+  const departmentId = data.department_id
+    ? await assertDepartmentInSchool(sb, data.department_id, data.school_id)
+    : await ensureDepartment(sb, data.school_id, (data.department_name ?? "").trim() || data.name);
   const { data: row, error } = await sb
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from("school_subjects" as any)
@@ -1201,17 +1208,27 @@ export async function createSchoolSubject(data: {
   return (row as { id: string }).id;
 }
 
-/** Кафедра школы по имени: находит существующую или заводит новую. */
+/**
+ * Кафедра школы по имени: находит существующую или заводит новую.
+ *
+ * `строго` — для случая, когда админ заводит кафедру руками: тогда
+ * совпадение имени не «нашлась, берём», а отказ. Молча отдать чужую строку
+ * значило бы сказать «создано» о том, что уже было.
+ */
 async function ensureDepartment(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   schoolId: string,
   name: string,
+  строго = false,
 ): Promise<string> {
   const { data: found } = await sb
     .from("departments").select("id")
     .eq("school_id", schoolId).eq("name", name).maybeSingle();
-  if (found) return (found as { id: string }).id;
+  if (found) {
+    if (строго) throw new Error("DEPARTMENT_NAME_TAKEN");
+    return (found as { id: string }).id;
+  }
 
   const { data: created, error } = await sb
     .from("departments").insert({ school_id: schoolId, name }).select("id").single();
@@ -2831,3 +2848,159 @@ export async function resetParentPassword(
   return newPassword;
 }
 
+/** Кафедра принадлежит этой школе — иначе предмет уехал бы к чужой. */
+async function assertDepartmentInSchool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  departmentId: string,
+  schoolId: string,
+): Promise<string> {
+  const { data } = await sb
+    .from("departments").select("id").eq("id", departmentId).eq("school_id", schoolId).maybeSingle();
+  if (!data) throw new Error("WRONG_SCHOOL");
+  return departmentId;
+}
+
+// ── КАФЕДРЫ (миграция 255) ───────────────────────────────────────────────────
+//
+// ЧИТАЕМ СЛУЖЕБНЫМ КЛЮЧОМ, И ЭТО НЕ ЛЕНЬ. Материалы кафедры лежат в
+// teacher_library_materials, а её правила доступа пускают УЧИТЕЛЯ своей
+// кафедры — админ там не значится. Считать материалы под сессией админа
+// значило бы получить ноль и показать его как правду. Правила библиотеки
+// только что переписаны и трогать их незачем: админу нужно ЧИСЛО, а не сами
+// файлы, и число он получает здесь.
+//
+// ШКОЛА ПРОВЕРЯЕТСЯ У КАЖДОГО ДЕЙСТВИЯ (assertSameSchool), как у справочника
+// предметов: служебный ключ обходит правила, значит границу школы держит код.
+
+export type DepartmentImpact = {
+  subjects: number;
+  materials: number;
+  blocked: boolean;
+};
+
+/** Кафедры школы со счётчиками: предметов справочника и материалов. */
+export async function listDepartments(schoolId: string): Promise<Array<{
+  id: string; name: string; subjects: number; materials: number;
+}>> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const { data: rows, error } = await anySb
+    .from("departments")
+    .select("id, name, school_subjects(count), teacher_library_materials(count)")
+    .eq("school_id", schoolId)
+    .order("name");
+  if (error) throw error;
+  return ((rows ?? []) as Array<{
+    id: string; name: string;
+    school_subjects: { count: number }[] | null;
+    teacher_library_materials: { count: number }[] | null;
+  }>).map((r) => ({
+    id: r.id,
+    name: r.name,
+    subjects: r.school_subjects?.[0]?.count ?? 0,
+    materials: r.teacher_library_materials?.[0]?.count ?? 0,
+  }));
+}
+
+/** Что держит кафедру: предметы и материалы. Питает и слияние (что переедет),
+ *  и удаление (что мешает). Одно число на два вопроса — они про одно и то же. */
+export async function getDepartmentImpact(
+  id: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+): Promise<DepartmentImpact> {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "departments", id, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const считать = async (table: string) => {
+    const { count } = await anySb.from(table)
+      .select("id", { count: "exact", head: true }).eq("department_id", id);
+    return count ?? 0;
+  };
+  const [subjects, materials] = await Promise.all([
+    считать("school_subjects"), считать("teacher_library_materials"),
+  ]);
+  return { subjects, materials, blocked: subjects + materials > 0 };
+}
+
+export async function createDepartment(name: string, schoolId: string): Promise<string> {
+  const sb = getServiceClient();
+  return ensureDepartment(sb, schoolId, name, true);
+}
+
+/** Переименование. Связи держатся за id, поэтому имя меняется свободно —
+ *  предметы и материалы остаются на месте. */
+export async function renameDepartment(
+  id: string,
+  name: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+) {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "departments", id, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const { data: занято } = await anySb
+    .from("departments").select("id")
+    .eq("school_id", callerSchoolId).eq("name", name).maybeSingle();
+  if (занято && (занято as { id: string }).id !== id) throw new Error("DEPARTMENT_NAME_TAKEN");
+  const { error } = await anySb.from("departments").update({ name }).eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Слияние двух кафедр в одну.
+ *
+ * Предметы и материалы переставляются на принимающую, исходная удаляется. В
+ * этом порядке и только в нём: удалить первой база не даст (ON DELETE
+ * RESTRICT), и это правильно — сначала опустошить, потом убрать.
+ *
+ * Отката на полпути здесь нет: три отдельных запроса, а не одна транзакция —
+ * PostgREST её не даёт. Худшее, что бывает при обрыве, — предметы переехали,
+ * материалы нет: обе кафедры целы, ничего не потеряно, слияние повторяется.
+ */
+export async function mergeDepartments(
+  fromId: string,
+  toId: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+): Promise<{ subjects: number; materials: number }> {
+  if (fromId === toId) throw new Error("DEPARTMENT_MERGE_SAME");
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "departments", fromId, callerSchoolId, callerIsSuperAdmin);
+  await assertSameSchool(sb, "departments", toId, callerSchoolId, callerIsSuperAdmin);
+  const impact = await getDepartmentImpact(fromId, callerSchoolId, callerIsSuperAdmin);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const { error: subjErr } = await anySb
+    .from("school_subjects").update({ department_id: toId }).eq("department_id", fromId);
+  if (subjErr) throw subjErr;
+  const { error: matErr } = await anySb
+    .from("teacher_library_materials").update({ department_id: toId }).eq("department_id", fromId);
+  if (matErr) throw matErr;
+  const { error: delErr } = await anySb.from("departments").delete().eq("id", fromId);
+  if (delErr) throw delErr;
+
+  return { subjects: impact.subjects, materials: impact.materials };
+}
+
+/** Удаление пустой кафедры. Непустую не отдаст и база — отказ с числами
+ *  выдаётся здесь, чтобы админ прочитал причину, а не код 23503. */
+export async function deleteDepartment(
+  id: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+) {
+  const sb = getServiceClient();
+  const impact = await getDepartmentImpact(id, callerSchoolId, callerIsSuperAdmin);
+  if (impact.blocked) {
+    throw new Error(`BLOCKED_DEPARTMENT_IN_USE:${impact.subjects}:${impact.materials}`);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (sb as any).from("departments").delete().eq("id", id);
+  if (error) throw error;
+}

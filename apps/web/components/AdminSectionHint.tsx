@@ -31,6 +31,7 @@ const SECTIONS: ReadonlyArray<readonly [prefix: string, key: string]> = [
   ["/admin/groups", "groups"],
   ["/admin/subject-assignments", "assignments"],
   ["/admin/subjects", "subjects"],
+  ["/admin/departments", "departments"],
   ["/admin/announcements", "announcements"],
   ["/admin/parents", "parents"],
   ["/admin/marks", "marks"],
