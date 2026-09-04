@@ -81,7 +81,7 @@ async function resolveLoginCandidates(
   // простому адресу, и до резолвера дело не доходит.
   const [students, teachers, admins] = await Promise.all([
     anyAdmin.from("students").select("user_id, school_id").ilike("username", login),
-    anyAdmin.from("teachers").select("user_id, school_id").ilike("username", login),
+    anyAdmin.from("teachers").select("id, user_id, school_id").ilike("username", login),
     // Миграция 194 — у админов появилась своя колонка логина. До неё здесь
     // стоял пустой список, и администратор, которому при столкновении логинов
     // достался школьный адрес (`логин.код@admins.snr.local`), не мог войти
@@ -89,9 +89,28 @@ async function resolveLoginCandidates(
     anyAdmin.from("admins").select("user_id, school_id").ilike("username", login),
   ]);
 
+  // УЧИТЕЛЬ ДВУХ ШКОЛ — ОДНА СТРОКА, НО ДВЕ ШКОЛЫ. 06.09.2026.
+  //
+  // Строка `teachers` у него одна и указывает на домашнюю школу; вторая живёт
+  // в `teacher_schools`. Без этого разворота выбор школы на входе показывал бы
+  // ему одну школу вместо двух, а нажатие на вторую упиралось бы в «не ваша
+  // школа»: кандидата с ней просто не существовало.
+  const учителя = ((teachers.data ?? []) as Array<{ id: string; user_id: string | null; school_id: string }>)
+    .filter((r) => r.user_id);
+  const развёрнутые: Array<{ user_id: string | null; school_id: string }> = [];
+  for (const t of учителя) {
+    const { data: привязки } = await anyAdmin
+      .from("teacher_schools").select("school_id").eq("teacher_id", t.id).eq("is_active", true);
+    const школы = [...new Set([
+      t.school_id,
+      ...((привязки ?? []) as Array<{ school_id: string }>).map((r) => r.school_id),
+    ])];
+    for (const school_id of школы) развёрнутые.push({ user_id: t.user_id, school_id });
+  }
+
   const rows = [
     ...((students.data ?? []) as Array<{ user_id: string | null; school_id: string }>),
-    ...((teachers.data ?? []) as Array<{ user_id: string | null; school_id: string }>),
+    ...развёрнутые,
     ...((admins.data ?? []) as Array<{ user_id: string | null; school_id: string }>),
   ].filter((r) => r.user_id);
   if (rows.length === 0) return [];
@@ -109,22 +128,40 @@ async function resolveLoginCandidates(
       : null;
   }));
 
-  // Один и тот же адрес не должен встретиться дважды (ученик и учитель с
-  // одним user_id — невозможно, но подстрахуемся).
+  // ПОВТОРЫ СЧИТАЮТСЯ ПО ПАРЕ «АДРЕС + ШКОЛА», А НЕ ПО ОДНОМУ АДРЕСУ.
+  //
+  // Раньше ключом был адрес: у учителя двух школ обе записи несут ОДИН адрес
+  // (учётка-то одна), и вторая школа отсеивалась как дубль. Выбор школы на
+  // входе схлопывался в одну плитку и становился бессмысленным. Одна и та же
+  // школа с тем же адресом дважды по-прежнему не пройдёт.
   const seen = new Set<string>();
   return resolved.filter((c): c is NonNullable<typeof c> => {
-    if (!c || seen.has(c.email)) return false;
-    seen.add(c.email);
+    if (!c) return false;
+    const ключ = `${c.email} ${c.schoolId}`;
+    if (seen.has(ключ)) return false;
+    seen.add(ключ);
     return true;
   });
 }
 
 /**
- * Школа вошедшего — для сверки с той, что он выбрал на первом экране.
+ * Школы вошедшего — для сверки с той, что он выбрал на первом экране.
  *
- * Возвращает `{ schoolId: null }` для суперадминистратора: школы у него нет
- * вовсе, и это не ошибка, а его нормальное состояние. Такой ответ означает
+ * Возвращает пустой список для суперадминистратора и менеджера: школы у них
+ * нет вовсе, и это не ошибка, а нормальное состояние. Пустой список означает
  * «сверять не с чем, пропускай».
+ *
+ * ═══ ПОЧЕМУ СПИСОК, А НЕ ОДНА ШКОЛА. 06.09.2026 ═══════════════════════════
+ *
+ * Здесь бралась ОДНА школа — та, что записана в строке человека, — и с ней
+ * сверялась выбранная плитка. Для учителя, работающего в двух школах, это
+ * означало отказ на входе: он выбирает вторую школу, а строка `teachers`
+ * указывает на домашнюю, и вход обрывался с `wrong_school`. Не «попал не
+ * туда», а не вошёл вовсе.
+ *
+ * Теперь у учителя спрашиваются ВСЕ его школы: домашняя плюс действующие
+ * привязки `teacher_schools`. У остальных ролей список из одной школы —
+ * ровно прежнее поведение.
  *
  * Ищет по всем четырём ролям, у которых есть school_id: ученик, учитель,
  * администратор, родитель. Родитель тут обязателен — про него легко забыть,
@@ -133,7 +170,7 @@ async function resolveLoginCandidates(
  */
 async function schoolOfUser(
   userId: string,
-): Promise<{ schoolId: string | null; schoolName: string | null; isDemo: boolean }> {
+): Promise<{ schoolIds: string[]; schoolName: string | null; isDemo: boolean; teacherId: string | null }> {
   const admin = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyAdmin = admin as any;
@@ -145,21 +182,37 @@ async function schoolOfUser(
     // ему показывать нечего (миграция 250).
     anyAdmin.from("managers").select("id").eq("user_id", userId).maybeSingle(),
     anyAdmin.from("students").select("school_id").eq("user_id", userId).maybeSingle(),
-    anyAdmin.from("teachers").select("school_id").eq("user_id", userId).maybeSingle(),
+    anyAdmin.from("teachers").select("id, school_id").eq("user_id", userId).maybeSingle(),
     anyAdmin.from("admins").select("school_id").eq("user_id", userId).maybeSingle(),
     anyAdmin.from("parents").select("school_id").eq("user_id", userId).maybeSingle(),
   ]);
 
-  if (sup.data || mg.data) return { schoolId: null, schoolName: null, isDemo: false };
+  if (sup.data || mg.data) return { schoolIds: [], schoolName: null, isDemo: false, teacherId: null };
 
-  const schoolId = (st.data?.school_id ?? te.data?.school_id ?? ad.data?.school_id ?? pa.data?.school_id ?? null) as string | null;
-  if (!schoolId) return { schoolId: null, schoolName: null, isDemo: false };
+  const teacherId = (te.data?.id ?? null) as string | null;
+  const домашняя = (st.data?.school_id ?? te.data?.school_id ?? ad.data?.school_id ?? pa.data?.school_id ?? null) as string | null;
+  if (!домашняя) return { schoolIds: [], schoolName: null, isDemo: false, teacherId };
 
-  const { data: school } = await anyAdmin.from("schools").select("name, is_demo").eq("id", schoolId).maybeSingle();
+  // Привязки спрашиваются ТОЛЬКО у учителя: у остальных ролей второй школы не
+  // бывает, и лишний запрос на каждом входе им ни к чему.
+  let школы = [домашняя];
+  if (teacherId) {
+    const { data: привязки } = await anyAdmin
+      .from("teacher_schools").select("school_id").eq("teacher_id", teacherId).eq("is_active", true);
+    школы = [...new Set([
+      домашняя,
+      ...((привязки ?? []) as Array<{ school_id: string }>).map((r) => r.school_id),
+    ])];
+  }
+
+  // Имя и признак демо — по ДОМАШНЕЙ школе: они нужны только для текста
+  // отказа «этот логин из такой-то школы» и для пропуска демо-аккаунта.
+  const { data: school } = await anyAdmin.from("schools").select("name, is_demo").eq("id", домашняя).maybeSingle();
   return {
-    schoolId,
+    schoolIds: школы,
     schoolName: (school as { name: string } | null)?.name ?? null,
     isDemo: Boolean((school as { is_demo: boolean } | null)?.is_demo),
+    teacherId,
   };
 }
 
@@ -195,9 +248,30 @@ async function finishLogin(
   //     как был.
   if (expectedSchoolId) {
     const mine = await schoolOfUser(user.id);
-    if (mine.schoolId && !mine.isDemo && mine.schoolId !== expectedSchoolId) {
+    if (mine.schoolIds.length > 0 && !mine.isDemo && !mine.schoolIds.includes(expectedSchoolId)) {
       await supabase.auth.signOut({ scope: "local" });
       return { ok: false, error: "wrong_school", schoolName: mine.schoolName };
+    }
+
+    // ВЫБРАННАЯ ПЛИТКА — ЭТО И ЕСТЬ ВЫБОР ШКОЛЫ. 06.09.2026.
+    //
+    // Отдельного шага «в какую школу входите» не заводим: он уже есть — тот
+    // самый первый экран с плитками школ. Человек нажал на школу, значит
+    // пришёл в неё; высадить его в другую только потому, что в прошлый раз
+    // он выбирал иначе, было бы враньём про его же нажатие.
+    //
+    // Пишем только учителю двух и более школ: у остальных выбирать нечего, а
+    // правило записи (`staff_active_school_set`) для не-учителя всё равно
+    // откажет. Проверку «работает ли он там» второй раз не делаем — её делает
+    // база, и делает под сессией самого человека.
+    if (mine.teacherId && mine.schoolIds.length > 1) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: выборErr } = await (supabase as any)
+        .from("staff_active_school")
+        .upsert({ user_id: user.id, school_id: expectedSchoolId }, { onConflict: "user_id" });
+      // Не вышло — вход не рушим: человек окажется в прошлой выбранной школе
+      // и переключится в шапке. Молчать нельзя, но и падать не за что.
+      if (выборErr) console.error("[login] выбор школы не записался:", выборErr.message);
     }
   }
 
@@ -313,7 +387,10 @@ export async function loginWithUsernameInSchool(
   if (signed.error || !signed.data.user || !signed.data.session) {
     return { ok: false, error: "invalid" };
   }
-  return finishLogin(supabase, signed.data.user, signed.data.session.access_token);
+  // Школа передаётся дальше: на этом шаге её выбрали явно, и запомнить выбор
+  // здесь так же обязательно, как и на первом экране. Раньше сюда уходило
+  // пусто, и выбор второго шага пропадал.
+  return finishLogin(supabase, signed.data.user, signed.data.session.access_token, schoolId);
 }
 
 export async function demoLogin(

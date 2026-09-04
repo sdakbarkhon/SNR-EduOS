@@ -64,25 +64,15 @@ import { resolveSchoolStep, type PublicSchool } from "./school-step";
  * запомненный выбор не должен превращаться в ловушку для того, кто ошибся.
  */
 
-const STORAGE_KEY = "login_school_id";
-
 // Тип и правило шага переехали в school-step.ts: их зовёт и сервер тоже.
 export type { PublicSchool };
 
-export function readRememberedSchool(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null; // приватный режим — просто спросим заново
-  }
-}
-
-export function rememberSchool(id: string | null): void {
-  try {
-    if (id) localStorage.setItem(STORAGE_KEY, id);
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch { /* приватный режим — переживём */ }
-}
+// Ключ и обе ручки памяти переехали в lib/remembered-school.ts: с появлением
+// переключателя школы в шапке помнить выбор стало нужно и там, а два ключа
+// разошлись бы на первой же правке. Здесь оставлен ре-экспорт — экран входа
+// зовёт их по-прежнему.
+import { readRememberedSchool, rememberSchool } from "@/lib/remembered-school";
+export { readRememberedSchool, rememberSchool };
 
 export function SchoolPickerModal({
   locale,

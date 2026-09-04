@@ -6,6 +6,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
+import { rememberSchool } from "@/lib/remembered-school";
 
 /**
  * ПЕРЕКЛЮЧАТЕЛЬ ШКОЛЫ В ШАПКЕ УЧИТЕЛЯ. 06.09.2026.
@@ -85,6 +86,11 @@ export function SchoolSwitcher({
         .from("staff_active_school")
         .upsert({ user_id: user.id, school_id: school.id }, { onConflict: "user_id" });
       if (error) throw error;
+      // ЭКРАН ВХОДА ДОЛЖЕН ПОМНИТЬ ТО ЖЕ САМОЕ. Иначе выйдет так: человек
+      // переключился здесь, вышел, а вход показывает прежнюю школу — и,
+      // показав её, в неё же и заведёт. Виденное на экране входа обязано
+      // совпадать с тем, куда человек попадёт.
+      rememberSchool(school.id);
       // Документ заново — см. пояснение в шапке файла.
       window.location.assign("/teacher");
     } catch (e) {
