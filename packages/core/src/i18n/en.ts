@@ -516,6 +516,7 @@ export const en: Dictionary = {
     navGroups: "Groups",
     navSubjects: "Subjects",
     navDepartments: "Departments",
+    groupsSubjectsColumn: "Subjects",
     navAssignments: "Assignments",
     navAnnouncements: "Announcements",
     navParents: "Parents",

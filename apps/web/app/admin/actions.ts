@@ -21,7 +21,6 @@ import { createClient } from "@/lib/supabase/server";
 import { changedFields, GOOGLE_EMAIL_FIELDS } from "@/lib/form-patch";
 import { parseCoursePrice } from "@/lib/course-price";
 import { guard, type ActionResult } from "@/lib/action-result";
-import { getSubjectKeyByLabel } from "@snr/core";
 import { revalidatePath } from "next/cache";
 import { verifyStaff, type StaffRole } from "@/lib/verify-staff";
 
@@ -318,24 +317,27 @@ export async function actionSetAssignmentTeacher(assignmentId: string, teacherId
 
 // ── GROUPS ────────────────────────────────────────────────────────────────────
 
-/** Z.2.2: форма группы шлёт id записи справочника, а groups.subject — это
- *  text NOT NULL, куда исторически пишется СЛАГ ('programming' и т.п.), и по
- *  нему по всему приложению работает getSubjectStyle(). Поэтому резолвим:
- *  справочник → название → слаг. Если название не из 10 известных ключей
- *  (админ завёл свой предмет), слага нет — пишем само название: колонка
- *  NOT NULL, пустую строку туда класть хуже. Стиль такого предмета будет
- *  дефолтным серым — известный предел, зафиксирован отдельным шагом в
- *  plan-z2-admin-rebuild.md. Схему groups.subject тут НЕ трогаем (Z.2.5/Z.2.6). */
-async function resolveGroupSubject(formData: FormData, schoolId: string): Promise<string> {
-  const catalogId = String(formData.get("subject_catalog_id") ?? "").trim();
-  if (!catalogId) throw new Error("Missing fields");
-  const sb = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: row } = await (sb as any)
-    .from("school_subjects").select("name, school_id").eq("id", catalogId).maybeSingle();
-  if (!row || row.school_id !== schoolId) throw new Error("Предмет не найден");
-  return getSubjectKeyByLabel(row.name) ?? row.name;
-}
+/**
+ * ЧТО КЛАДЁТСЯ В groups.subject. 05.09.2026.
+ *
+ * Пустая строка. Колонка декоративна: она осталась от модели «группа = один
+ * курс», а настоящая связь «группа — предметы» живёт в назначениях
+ * (`subjects.group_id`). У трёх демо-классов в ней лежит 'programming', хотя
+ * предметов у каждого пять-шесть, — то есть она не просто бесполезна, она
+ * врёт.
+ *
+ * ЧИТАТЕЛЕЙ У НЕЁ БОЛЬШЕ НЕТ. Экраны задания и урока спрашивают справочник
+ * (`subject_id`), и строк без него в базе ноль: 0 из 60 заданий, 0 из 130
+ * уроков (замер 05.09.2026). Список групп показывает назначения. Помощник ИИ
+ * берёт предмет из назначения урока.
+ *
+ * ПОЧЕМУ ПУСТАЯ СТРОКА, А НЕ ОТСУТСТВИЕ ПОЛЯ. Колонка `text NOT NULL` без
+ * умолчания: пропустить её сегодня нельзя. Миграция 256 даёт ей умолчание и
+ * помечает устаревшей — после неё поле можно будет не передавать вовсе, а
+ * сама колонка уходит в конце цепочки заходов. Пустая строка работает и до
+ * миграции, и после: порядок выкатки ничего не ломает.
+ */
+const ПУСТОЙ_ПРЕДМЕТ_ГРУППЫ = "";
 
 // 30.08.2026 — ФУНКЦИИ readCuratorId ЗДЕСЬ БОЛЬШЕ НЕТ.
 //
@@ -385,9 +387,8 @@ export async function actionCreateGroup(formData: FormData) {
     const { schoolId, role } = await verifyAdmin(школаИзФормы);
     const name = String(formData.get("name") ?? "").trim();
     if (!name) throw new Error("Missing fields");
-    const subject = await resolveGroupSubject(formData, schoolId);
     const id = await createGroup({
-      name, subject, teacher_id: null, school_id: schoolId,
+      name, subject: ПУСТОЙ_ПРЕДМЕТ_ГРУППЫ, teacher_id: null, school_id: schoolId,
       // Админ цену не шлёт — значит undefined, и колонка берёт своё
       // умолчание: `course_price integer NOT NULL DEFAULT 0`. Ноль означает
       // «цена не задана», и ученик такой группы виден менеджеру в помехах
@@ -430,10 +431,9 @@ export async function actionCreateGroupsBulk(
     const names = разобрано.map((v) => String(v).trim()).filter(Boolean);
     if (names.length === 0) throw new Error("Missing fields");
 
-    const subject = await resolveGroupSubject(formData, schoolId);
     const итог = await createGroupsBulk({
       names,
-      subject,
+      subject: ПУСТОЙ_ПРЕДМЕТ_ГРУППЫ,
       // У менеджера поле есть всегда, пустое = 0. У админа поля нет вовсе —
       // undefined, и вся пачка заводится с нулём, то есть «цена не задана».
       coursePrice: readCoursePrice(formData, role) ?? 0,
@@ -537,13 +537,13 @@ export async function actionUpdateGroup(formData: FormData) {
     const { schoolId, isSuperAdmin, role } = await verifyAdmin(школаИзФормы);
     const group_id = String(formData.get("group_id") ?? "");
     const name = String(formData.get("name") ?? "").trim();
-    const subject = await resolveGroupSubject(formData, schoolId);
     await updateGroup(
       group_id,
-      // Админ правит имя и предмет, цену не шлёт — undefined, и updateGroup
-      // её НЕ ТРОГАЕТ (см. lib/admin-api.ts). Заданная менеджером цена
-      // переживает любую правку группы админом.
-      { name, subject, course_price: readCoursePrice(formData, role) },
+      // Админ правит только имя: предмета у группы в форме больше нет, цену
+      // он не шлёт — undefined, и updateGroup её НЕ ТРОГАЕТ (см.
+      // lib/admin-api.ts). Заданная менеджером цена переживает любую правку
+      // группы админом, а декоративная колонка не переписывается вовсе.
+      { name, course_price: readCoursePrice(formData, role) },
       schoolId,
       isSuperAdmin,
     );

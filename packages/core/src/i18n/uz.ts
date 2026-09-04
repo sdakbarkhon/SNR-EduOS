@@ -516,6 +516,7 @@ export const uz: Dictionary = {
     navGroups: "Guruhlar",
     navSubjects: "Fanlar",
     navDepartments: "Kafedralar",
+    groupsSubjectsColumn: "Fanlar",
     navAssignments: "Tayinlashlar",
     navAnnouncements: "E'lonlar",
     navParents: "Ota-onalar",

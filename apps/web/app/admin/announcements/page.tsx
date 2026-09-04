@@ -27,7 +27,7 @@ export default async function AdminAnnouncementsPage() {
       .then(({ data }: { data: unknown[] | null }) => data ?? []),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (db as any).from("groups")
-      .select("id, name, subject")
+      .select("id, name")
       .order("name")
       .then(({ data }: { data: unknown[] | null }) => data ?? []),
   ]);
@@ -36,7 +36,7 @@ export default async function AdminAnnouncementsPage() {
     ...a, groupName: null, targetStudentName: null, readCount: 0, totalRecipients: 0,
   }));
 
-  const groups = groupsRaw as Array<{ id: string; name: string; subject: string }>;
+  const groups = groupsRaw as Array<{ id: string; name: string }>;
 
   return (
     <AdminAnnouncementsView

@@ -515,6 +515,7 @@ export interface Dictionary {
     navGroups: string;
     navSubjects: string;
     navDepartments: string;
+    groupsSubjectsColumn: string;
     departmentsTitle: string;
     departmentsSubtitle: string;
     departmentsAdd: string;

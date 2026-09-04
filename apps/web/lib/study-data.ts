@@ -35,7 +35,13 @@ export async function loadGroupsPage(db: Db, schoolId?: string | null) {
         // 30.08.2026 — связь teachers из выборки убрана вместе с колонкой
         // «Куратор»: между groups и teachers два пути, и PostgREST валил
         // весь запрос ошибкой PGRST201.
-        "id, name, subject, teacher_id, course_price, student_groups(student_id)",
+        //
+        // 05.09.2026 — предметы группы берутся из НАЗНАЧЕНИЙ, а не из
+        // колонки groups.subject. Колонка хранит один слаг от модели «группа
+        // = один курс»: у трёх демо-классов там 'programming', хотя предметов
+        // у каждого пять-шесть. Список назначений говорит правду.
+        "id, name, subject, teacher_id, course_price, student_groups(student_id), "
+        + "subjects(id, name, is_active, is_stub)",
       ),
       schoolId,
     ).order("name"),

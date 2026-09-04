@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Puzzle } from "lucide-react";
-import { getDictionary, submitCodeCompletionHomework } from "@snr/core";
+import { getDictionary, submitCodeCompletionHomework, resolveSubject } from "@snr/core";
 import type { HomeworkWithSubmission, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, useLocale } from "@/components";
@@ -30,8 +30,14 @@ export function CodeCompletionSolver({ hw }: { hw: HomeworkWithSubmission }) {
 
   const payload = hw.code_completion_data;
   const existing = hw.submission?.code_completion_answers ?? null;
-  const subjectLabel = hw.subjectName ?? hw.group.subject;
-  const subjectColor = hw.subjectColor ?? "#64748b";
+  // Через общий резолвер, как и остальные пять экранов задания: справочник
+  // первым, устаревший слаг группы — запасным.
+  const subjectStyle = resolveSubject({
+    catalog: { name: hw.subjectName, color: hw.subjectColor },
+    slug: hw.group.subject,
+  });
+  const subjectLabel = subjectStyle.label;
+  const subjectColor = subjectStyle.color;
 
   async function handleSubmit(result: { answers: Record<string, string>; score: number; total: number }) {
     if (!studentId) return;

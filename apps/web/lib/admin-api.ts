@@ -1093,14 +1093,14 @@ export async function quickStartGroup(input: QuickStartInput): Promise<QuickStar
 
   // ── 2. ГРУППА ─────────────────────────────────────────────────────────
   //
-  // groups.subject подставляется первым выбранным предметом, а не
-  // спрашивается. Если предметов не выбрано вовсе — пустая строка: колонка
-  // NOT NULL, но пустоту она допускает (у всех десяти живых групп там слаг,
-  // но ограничения на непустоту нет).
-  const первый = catalogIds[0] ? (имяПоId.get(catalogIds[0]) ?? "") : "";
+  // 05.09.2026 — groups.subject больше не подставляется вовсе. Раньше сюда
+  // клался первый выбранный предмет; читателей у колонки не осталось, и
+  // выдуманное значение только дало бы следующему человеку повод в него
+  // поверить. Предметы группы видны там, где они на самом деле лежат, — в
+  // назначениях, которые заводятся шагом ниже.
   const groupId = await createGroup({
     name: input.groupName.trim(),
-    subject: первый ? (getSubjectKeyByLabel(первый) ?? первый) : "",
+    subject: "",
     teacher_id: null,
     school_id: input.schoolId,
     course_price: input.coursePrice,
@@ -1133,7 +1133,7 @@ export async function quickStartGroup(input: QuickStartInput): Promise<QuickStar
 
 export async function updateGroup(
   groupId: string,
-  data: { name: string; subject: string; teacher_id?: string | null; course_price?: number },
+  data: { name: string; teacher_id?: string | null; course_price?: number },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ) {
@@ -1144,7 +1144,9 @@ export async function updateGroup(
   // teacher_id пишется, только если форма его прислала. Для реальных школ
   // поля в форме нет — и существующий куратор (если он там откуда-то есть)
   // не должен молча обнуляться при переименовании группы.
-  const patch: Record<string, unknown> = { name: data.name, subject: data.subject };
+  // subject НЕ в наборе: декоративная колонка не переписывается при правке
+  // имени. Что в ней лежит у старых групп — там и останется до конца цепочки.
+  const patch: Record<string, unknown> = { name: data.name };
   if (data.teacher_id !== undefined) patch.teacher_id = data.teacher_id || null;
   // Цена — по тому же правилу, что куратор: пишем, только если форма её
   // прислала. Пустое поле формы — это ноль и он приедет числом; молчание

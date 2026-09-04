@@ -1012,7 +1012,7 @@ export const getStudentById = async (db: Db, studentId: string) => {
     .from("students")
     .select(
       "id, full_name, birth_date, avatar_url, balance, status, created_at, " +
-      "student_groups(groups(id, name, subject, teacher:teachers!groups_teacher_id_fkey(id, full_name, phone)))",
+      "student_groups(groups(id, name, teacher:teachers!groups_teacher_id_fkey(id, full_name, phone)))",
     )
     .eq("id", studentId)
     .single();
@@ -1020,7 +1020,7 @@ export const getStudentById = async (db: Db, studentId: string) => {
   const row = data as {
     id: string; full_name: string; birth_date: string | null; avatar_url: string | null;
     balance: number; status: StudentStatus; created_at: string;
-    student_groups: Array<{ groups: { id: string; name: string; subject: string; teacher: { id: string; full_name: string; phone: string | null } | null } | null }>;
+    student_groups: Array<{ groups: { id: string; name: string; teacher: { id: string; full_name: string; phone: string | null } | null } | null }>;
   };
   // Куратор — учитель ПЕРВОЙ группы ученика. Групп у ученика в этой
   // модели одна; find, а не [0], потому что элемент с groups: null в

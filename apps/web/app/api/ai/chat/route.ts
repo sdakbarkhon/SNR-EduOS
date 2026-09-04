@@ -102,14 +102,18 @@ export async function POST(req: NextRequest) {
   // Get lesson context + membership check (student must be enrolled in lesson's group)
   //
   // Предмет берём из НАЗНАЧЕНИЯ урока (lessons.subject_id → subjects.name),
-  // а не из groups.subject. groups.subject — скалярный слаг, оставшийся от
-  // времён «одна группа = один предмет»: у всех трёх демо-классов там лежит
-  // 'programming', поэтому на уроке русского помощнику сообщали
-  // «Предмет: programming», и он честно отвечал про программирование.
+  // и только оттуда. groups.subject — скалярный слаг от времён «одна группа =
+  // один предмет»: у всех трёх демо-классов там лежит 'programming', поэтому
+  // на уроке русского помощнику сообщали «Предмет: programming», и он честно
+  // отвечал про программирование.
+  //
+  // 05.09.2026 — запасной путь через группу убран. Он не спасал, а врал: у
+  // урока без назначения он подставлял чужой предмет вместо молчания. Уроков
+  // без subject_id в базе ноль (замер 05.09.2026), так что терять нечего.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = lessonId ? await (db as any)
     .from("lessons")
-    .select("id, title, topic, description, group_id, subject:subjects(name), group:groups(subject)")
+    .select("id, title, topic, description, group_id, subject:subjects(name)")
     .eq("id", lessonId)
     .single() : { data: null };
 
@@ -138,10 +142,7 @@ export async function POST(req: NextRequest) {
   // ноль строк.
   const ragPromise = buildRagContext(db, body.user_message, lessonId, student.school_id ?? null);
 
-  const lessonSubject =
-    (lesson?.subject as { name: string } | null)?.name
-    ?? (lesson?.group as { subject: string } | null)?.subject
-    ?? "";
+  const lessonSubject = (lesson?.subject as { name: string } | null)?.name ?? "";
   const lessonTitle = lesson?.topic ?? lesson?.title ?? "Урок";
   const lessonDesc = lesson?.description ?? "";
 

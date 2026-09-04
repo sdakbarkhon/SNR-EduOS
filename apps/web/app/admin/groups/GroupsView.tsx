@@ -9,7 +9,7 @@ import { Pencil, Trash2, Plus, X, ListPlus, AlertTriangle, Loader2 } from "lucid
 // → слаг», нужный чтобы groups.subject продолжал хранить слаг, как сегодня, и
 // getSubjectStyle по всему приложению не сломался. Сам config/subjects.ts
 // живёт дальше — он слой стилей для всего проекта, включая apps/mobile.
-import { getDictionary, getSubjectKeyByLabel, type Locale } from "@snr/core";
+import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
@@ -26,6 +26,8 @@ export type CatalogItem = { id: string; name: string; is_active: boolean };
 type Group = {
   id: string;
   name: string;
+  /** Устаревшая колонка «предмет группы». Больше не читается: предметы
+   *  берутся из `subjects` ниже. Уходит в конце цепочки заходов. */
   subject: string;
   teacher_id: string | null;
   /** Цена обучения в месяц, сумы, целое. НОЛЬ ЗНАЧИТ «не задана», а не
@@ -34,6 +36,8 @@ type Group = {
   // 30.08.2026 — связи teachers здесь больше нет: колонка «Куратор» ушла
   // из таблицы вместе с ролью.
   student_groups: { student_id: string }[];
+  /** Настоящие предметы группы — назначения (`subjects.group_id`). */
+  subjects?: Array<{ id: string; name: string; is_active: boolean; is_stub: boolean }>;
 };
 
 type Modal =
@@ -112,20 +116,10 @@ function CoursePriceInput({ defaultValue }: { defaultValue: number }) {
   );
 }
 
-function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      {...props}
-      className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
-    />
-  );
-}
-
 type AdminDict = ReturnType<typeof getDictionary>["admin"];
 
 function GroupForm({
   defaultValues,
-  catalog,
   isPending,
   t,
   onClose,
@@ -134,7 +128,6 @@ function GroupForm({
   canPrice,
 }: {
   defaultValues?: Partial<Group>;
-  catalog: CatalogItem[];
   isPending: boolean;
   t: AdminDict;
   onClose: () => void;
@@ -142,34 +135,20 @@ function GroupForm({
   submitLabel: string;
   canPrice: boolean;
 }) {
-  // ЧТО ИМЕННО ЛЕЖИТ В groups.subject. Server action пишет туда
-  // `getSubjectKeyByLabel(имя) ?? имя` — то есть слаг, если предмет есть в
-  // захардкоженной карте, и САМО НАЗВАНИЕ, если его там нет. Второй случай
-  // настоящий: школа заводит свой предмет («Схемотехника»), в карте его нет,
-  // и в колонке оказывается русское слово.
+  // 05.09.2026 — ВОПРОСА ПРО ПРЕДМЕТ ЗДЕСЬ БОЛЬШЕ НЕТ.
   //
-  // 22.08.2026 — ОТСЮДА И БРАЛАСЬ ПУСТОТА. Форма сравнивала только по слагу
-  // (`getSubjectKeyByLabel(c.name) === currentSlug`), для своего предмета
-  // получала null против «Схемотехника», совпадения не находила и открывала
-  // пустое поле выбора. Затирания не было — поле обязательное, — но админ,
-  // зашедший переименовать группу, выбирал предмет заново и мог промахнуться.
-  // Теперь сравнение повторяет запись сервера буква в букву.
-  const storedFor = (name: string) => getSubjectKeyByLabel(name) ?? name;
-
-  // Скрытые предметы не предлагаем; но если у редактируемой группы стоит
-  // именно скрытый — оставляем его в списке, иначе сохранение молча
-  // переключило бы предмет на другой.
-  const currentSlug = defaultValues?.subject ?? "";
-  const options = catalog.filter((c) => c.is_active || storedFor(c.name) === currentSlug);
-  const matched = options.find((c) => storedFor(c.name) === currentSlug);
-
-  // Предмет группы, которого в справочнике больше нет (переименовали, завели
-  // группу до справочника). Показываем его КАК ЕСТЬ вместо пустоты — иначе
-  // админ не видит, что вообще стоит у группы. Выбрать его снова нельзя:
-  // строка неактивна и её значение пустое, а поле обязательное, поэтому
-  // сохранить, не выбрав живой предмет, браузер не даст. Молча подменить
-  // предмет тоже невозможно.
-  const orphanSubject = currentSlug && !matched ? currentSlug : null;
+  // Он существовал ради одной колонки — groups.subject, — а та декоративна:
+  // настоящая связь «группа — предметы» живёт в назначениях. У класса их
+  // пять-шесть, и спрашивать «какой предмет у класса» значит требовать
+  // ответ, который всё равно неполон и ни на что не влияет.
+  //
+  // Вместе с вопросом ушли и три подпорки под ним: мост «название → слаг»,
+  // поиск совпадения по нему и показ предмета, которого в справочнике уже
+  // нет. Их не стало не потому, что они были плохи, а потому, что чинили
+  // они последствия самой колонки.
+  //
+  // ПРЕДМЕТЫ ГРУППЕ ЗАДАЮТСЯ НАЗНАЧЕНИЯМИ — на /admin/subject-assignments
+  // или в едином окне создания. Там их можно дать сколько нужно.
 
   return (
     <form
@@ -178,25 +157,6 @@ function GroupForm({
     >
       <Field label={t.fieldGroupName}>
         <Input name="name" required placeholder="Математика 7А" defaultValue={defaultValues?.name} />
-      </Field>
-      <Field label={t.fieldSubject}>
-        {/* Z.2.2: значение — id записи справочника; слаг для groups.subject
-            резолвит server action. Пустой справочник = новая школа, админ
-            заводит предметы на /admin/subjects. */}
-        <Select
-          name="subject_catalog_id"
-          required
-          defaultValue={matched?.id ?? ""}
-        >
-          <option value="" disabled>
-            {orphanSubject ?? (catalog.length === 0 ? t.groupsNoSubjectsYet : t.selectSubjectPlaceholder)}
-          </option>
-          {options.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}{c.is_active ? "" : ` (${t.subjectsHiddenBadge})`}
-            </option>
-          ))}
-        </Select>
       </Field>
       {/* ПОЛЯ КУРАТОРА ЗДЕСЬ БОЛЬШЕ НЕТ (30.08.2026). Роль убрана из
           продукта: миграция 242 обнулила groups.teacher_id у всех групп и
@@ -286,24 +246,30 @@ export function GroupsView({
   const d = getDictionary(locale as Locale);
   const t = d.admin;
 
-  // Z.2.2: подпись предмета в таблице берём из справочника школы, а не из
-  // захардкоженной карты. groups.subject хранит слаг, справочник — русские
-  // названия, поэтому мост тот же getSubjectKeyByLabel.
-  const nameBySlug = new Map<string, string>();
-  for (const c of catalog) {
-    const slug = getSubjectKeyByLabel(c.name);
-    if (slug) nameBySlug.set(slug, c.name);
-  }
+  // 05.09.2026 — ПРЕДМЕТЫ ГРУППЫ БЕРУТСЯ ИЗ НАЗНАЧЕНИЙ.
+  //
+  // Раньше в строке стояла подпись из groups.subject — одного слага, который
+  // форма проставляла при создании. У 10-А класса там 'programming', а
+  // предметов у него шесть: строка показывала один и молчала про остальные.
+  // Теперь перечисляем настоящие — те, что заведены назначениями.
+  const предметыГруппы = (g: Group) =>
+    (g.subjects ?? [])
+      .filter((s) => s.is_active && !s.is_stub)
+      .map((s) => s.name)
+      .sort((a, b) => a.localeCompare(b));
 
   // Форма группы требует предмет из справочника. Пока активных предметов
   // нет, создавать нечем — и это должно решаться ДО открытия окна.
+  //
+  // 05.09.2026 — ЗАПОР СНЯТ. Группу можно завести до предметов: форма о них
+  // больше не спрашивает. Прежняя запись оставлена ниже как след решения.
   //
   // 03.09.2026 — ДЫРА, ЗАКРЫТАЯ ЗДЕСЬ. Кнопка выключалась по noSubjects, а
   // окно, открытое сразу по адресу /admin/groups?action=add с дашборда, про
   // запрет не знало вовсе: список предметов пуст, поле обязательное, форма
   // открывалась в тупик. Поэтому noSubjects считается выше состояния и входит
   // в его начальное значение.
-  const noSubjects = catalog.filter((cItem) => cItem.is_active).length === 0;
+  const noSubjects = false;
 
   const [modal, setModal] = useState<Modal | null>(
     defaultOpenAdd && !noSubjects ? { kind: "add" } : null,
@@ -325,7 +291,6 @@ export function GroupsView({
   const [bulkTo, setBulkTo] = useState("11");
   const [bulkLetters, setBulkLetters] = useState("А");
   const [bulkNames, setBulkNames] = useState("");
-  const [bulkSubject, setBulkSubject] = useState("");
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkTruncated, setBulkTruncated] = useState<number | null>(null);
   const [bulkResult, setBulkResult] = useState<BulkGroupsResult | null>(null);
@@ -340,7 +305,6 @@ export function GroupsView({
 
   function openBulk() {
     setBulkNames("");
-    setBulkSubject("");
     setBulkPrice("");
     setBulkTruncated(null);
     setBulkResult(null);
@@ -365,12 +329,11 @@ export function GroupsView({
   }
 
   function handleBulkCreate() {
-    if (bulkCheck.fresh.length === 0 || !bulkSubject) return;
+    if (bulkCheck.fresh.length === 0) return;
     setBulkBusy(true);
     setBulkError("");
     const fd = new FormData();
     fd.set("names", JSON.stringify(bulkCheck.fresh));
-    fd.set("subject_catalog_id", bulkSubject);
     // Поля цены у админа нет — и в форму она не кладётся вовсе. Отсутствие
     // поля readCoursePrice понимает как «не трогать», а на создании это
     // означает умолчание колонки: ноль. Прислать её админ не может — сервер
@@ -406,7 +369,7 @@ export function GroupsView({
     const q = search.toLowerCase();
     return (
       g.name.toLowerCase().includes(q) ||
-      g.subject.toLowerCase().includes(q)
+      предметыГруппы(g).some((n) => n.toLowerCase().includes(q))
     );
   });
 
@@ -454,7 +417,7 @@ export function GroupsView({
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                 <th className="px-4 py-3">{t.fieldGroupName}</th>
-                <th className="px-4 py-3">{t.fieldSubject}</th>
+                <th className="px-4 py-3">{t.groupsSubjectsColumn}</th>
                 <th className="px-4 py-3">{t.tableStudentCount}</th>
                 <th className="px-4 py-3">{t.tableCoursePrice}</th>
                 <th className="px-4 py-3 text-right">{t.tableActions}</th>
@@ -467,7 +430,8 @@ export function GroupsView({
                 </tr>
               ) : (
                 filtered.map((g) => {
-                  const subjectLabel = nameBySlug.get(g.subject) ?? g.subject;
+                  const названия = предметыГруппы(g);
+                  const subjectLabel = названия.length > 0 ? названия.join(", ") : "—";
                   return (
                     <tr key={g.id} className="hover:bg-gray-50/60">
                       <td className="px-4 py-3 font-medium text-gray-800">{g.name}</td>
@@ -588,19 +552,6 @@ export function GroupsView({
                 </p>
               )}
 
-              <Field label={t.fieldSubject}>
-                <select
-                  value={bulkSubject}
-                  onChange={(e) => setBulkSubject(e.target.value)}
-                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
-                >
-                  <option value="" disabled>{t.selectSubjectPlaceholder}</option>
-                  {catalog.filter((cItem) => cItem.is_active).map((cItem) => (
-                    <option key={cItem.id} value={cItem.id}>{cItem.name}</option>
-                  ))}
-                </select>
-              </Field>
-
               {/* Цена одна на всю пачку — и уезжает к менеджеру целиком.
                   Админу вместо поля говорим, с чем заведутся группы: с нулём,
                   и что дальше. Умолчать было бы хуже: пачка из десяти групп
@@ -715,7 +666,7 @@ export function GroupsView({
               <button
                 type="button"
                 onClick={handleBulkCreate}
-                disabled={bulkBusy || bulkCheck.fresh.length === 0 || !bulkSubject}
+                disabled={bulkBusy || bulkCheck.fresh.length === 0}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
               >
                 {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListPlus className="h-4 w-4" />}
@@ -732,7 +683,6 @@ export function GroupsView({
         <Backdrop onClose={() => setModal(null)}>
           <ModalCard title={t.addGroupTitle} onClose={() => setModal(null)}>
             <GroupForm
-              catalog={catalog}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}
@@ -757,7 +707,6 @@ export function GroupsView({
           <ModalCard title={t.editGroupTitle} onClose={() => setModal(null)}>
             <GroupForm
               defaultValues={modal.group}
-              catalog={catalog}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}

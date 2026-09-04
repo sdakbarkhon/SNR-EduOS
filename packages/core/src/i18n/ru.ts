@@ -516,6 +516,7 @@ export const ru: Dictionary = {
     navGroups: "Группы",
     navSubjects: "Предметы",
     navDepartments: "Кафедры",
+    groupsSubjectsColumn: "Предметы",
     navAssignments: "Назначения",
     navAnnouncements: "Объявления",
     navParents: "Родители",

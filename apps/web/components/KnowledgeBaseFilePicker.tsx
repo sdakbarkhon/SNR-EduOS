@@ -778,7 +778,7 @@ export function KnowledgeBaseFilePicker({
       hideGroupMaterials
         ? Promise.resolve([])
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        : (sb as any).from("course_materials").select("*, group:groups(name, subject)").in("group_id", groupIds.length ? groupIds : ["__none__"])
+        : (sb as any).from("course_materials").select("*, group:groups(name)").in("group_id", groupIds.length ? groupIds : ["__none__"])
             .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sb as any).from("books").select("*")
