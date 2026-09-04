@@ -78,6 +78,7 @@ export interface Dictionary {
     draftStageFile: string;
     draftStageQueued: string;
     draftRunningHint: string;
+    draftStalled: string;
     draftsTitle: string;
     draftsEmpty: string;
     draftsNext: string;

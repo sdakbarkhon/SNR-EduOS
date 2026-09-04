@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { заказБрошен, ПРИЧИНА_БРОШЕННОГО } from "@/lib/plan-draft-stale";
 
 /**
  * ЗАКАЗ НА РАЗБОР УЧЕБНИКА. Кнопка «Создать учебный план». 06.09.2026.
@@ -22,6 +23,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * предмет) запрещён частичным уникальным индексом, и мы возвращаем тот, что
  * уже идёт. Проверка стоит ДО вставки (быстрый ответ) и ловится ПОСЛЕ неё
  * (две вкладки, нажавшие разом, до базы доходят одновременно).
+ *
+ * ═══ «УЖЕ ИДЁТ» — ТОЛЬКО ЕСЛИ ОН И ПРАВДА ИДЁТ ════════════════════════════
+ *
+ * Заказ, брошенный умершим фоном, в базе числится идущим до ночи, пока его не
+ * добьёт сторож. Экран его идущим не считает и кнопку не гасит — значит и эта
+ * ручка не имеет права отвечать «уже разбирается»: учитель нажал бы на живую
+ * кнопку и получил отказ, которого не понимает. Брошенный заказ здесь
+ * закрывается той же причиной, что пишет сторож, и на его месте заводится
+ * новый — уникальный индекс к этому времени уже свободен.
  *
  * ═══ ПРО ЗАПУСК ФОНА ══════════════════════════════════════════════════════
  *
@@ -109,12 +119,21 @@ export async function POST(req: NextRequest) {
   // Живой заказ на ту же четвёрку — возвращаем его, второй раз не платим.
   const { data: живой } = await служебный
     .from("curriculum_plan_drafts")
-    .select("id, status")
+    .select("id, status, created_at")
     .eq("teacher_id", teacher.id).eq("book_id", bookId)
     .eq("group_id", groupId).eq("subject_id", subjectId)
     .in("status", ["queued", "running"])
     .maybeSingle();
-  if (живой) return NextResponse.json({ id: живой.id, alreadyRunning: true });
+  if (живой) {
+    if (!заказБрошен(живой.created_at as string)) {
+      return NextResponse.json({ id: живой.id, alreadyRunning: true });
+    }
+    // Брошенный — закрываем и заводим новый вместо него.
+    await служебный
+      .from("curriculum_plan_drafts")
+      .update({ status: "failed", error_message: ПРИЧИНА_БРОШЕННОГО, finished_at: new Date().toISOString() })
+      .eq("id", живой.id);
+  }
 
   const title = body.title?.trim()
     || `${subject.name ?? "Предмет"} — ${group.name ?? "Группа"}`;

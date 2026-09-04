@@ -7,6 +7,7 @@ import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useRealtimeChannel } from "@/lib/realtime";
+import { заказБрошен } from "@/lib/plan-draft-stale";
 
 /**
  * ФАЙЛЫ УЧЕБНЫХ ПЛАНОВ — список заказов на разбор учебника. 06.09.2026.
@@ -44,6 +45,24 @@ export type PlanDraft = {
   created_at: string;
 };
 
+/** Одно понятие состояния на весь экран: и кнопка, и строка судят по нему. */
+export type СостояниеЗаказа = "идёт" | "брошен" | "готово" | "отказ";
+
+/**
+ * ЧТО НА САМОМ ДЕЛЕ С ЗАКАЗОМ.
+ *
+ * «Брошен» — это `queued`/`running`, который старше срока (см.
+ * lib/plan-draft-stale.ts, там же довод про десять минут). В базе он до ночи
+ * так и числится идущим; на экране он идущим не считается НИГДЕ — иначе вышло
+ * бы ровно то, чего быть не должно: кнопка ожила, а рядом крутится «модель
+ * составляет темы».
+ */
+export function состояниеЗаказа(x: PlanDraft, сейчас = Date.now()): СостояниеЗаказа {
+  if (x.status === "done") return "готово";
+  if (x.status === "failed") return "отказ";
+  return заказБрошен(x.created_at, сейчас) ? "брошен" : "идёт";
+}
+
 /**
  * ЖИВОЙ СПИСОК ЗАКАЗОВ. Хук, а не состояние внутри списка.
  *
@@ -58,7 +77,14 @@ export function usePlanDrafts(initialDrafts: PlanDraft[]) {
   const [drafts, setDrafts] = useState(initialDrafts);
   useEffect(() => { setDrafts(initialDrafts); }, [initialDrafts]);
 
-  const живые = drafts.some((x) => x.status === "queued" || x.status === "running");
+  // Живым считается только то, что действительно идёт. Брошенный заказ кнопку
+  // больше не держит: его добьёт сторож, а учителю ждать ночи незачем.
+  //
+  // Возраст пересчитывается сам собой: пока есть идущий заказ, опрос ниже
+  // каждые пять секунд кладёт в состояние новый список и вызывает перерисовку.
+  // Как только последний идущий перешагнул срок, опрос гаснет вместе с ним —
+  // ждать больше нечего.
+  const живые = drafts.some((x) => состояниеЗаказа(x) === "идёт");
 
   /** Свежий список. Зовётся и по подписке, и по таймеру: см. ниже. */
   const обновить = useCallback(async () => {
@@ -150,22 +176,33 @@ export function PlanDraftsList({ drafts }: { drafts: PlanDraft[] }) {
         </p>
       ) : (
         <ul className="space-y-2">
-          {drafts.map((x) => (
+          {drafts.map((x) => {
+          // Состояние считается ОДИН раз на строку и дальше решает всё: и текст,
+          // и значок, и полосу. Разные ветки, спрашивающие x.status напрямую,
+          // разъехались бы с кнопкой — брошенный заказ снова «шёл бы».
+          const состояние = состояниеЗаказа(x);
+          return (
             <li key={x.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center gap-3">
                 <BookOpen className="h-4 w-4 shrink-0 text-slate-300" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-bold text-slate-900">{x.title}</span>
 
-                  {(x.status === "queued" || x.status === "running") && (
+                  {состояние === "идёт" && (
                     <span className="mt-1 block text-xs text-slate-500">{стадия(x)}</span>
                   )}
-                  {x.status === "done" && (
+                  {состояние === "брошен" && (
+                    <span className="mt-1 flex items-start gap-1.5 text-xs text-amber-700">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      {d.draftStalled}
+                    </span>
+                  )}
+                  {состояние === "готово" && (
                     <span className="mt-1 block text-xs text-slate-500">
                       {d.draftTopicsCount.replace("{n}", String(x.topics_count ?? 0))}
                     </span>
                   )}
-                  {x.status === "failed" && (
+                  {состояние === "отказ" && (
                     <span className="mt-1 flex items-start gap-1.5 text-xs text-red-600">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       {x.error_message || d.draftFailedTitle}
@@ -173,13 +210,13 @@ export function PlanDraftsList({ drafts }: { drafts: PlanDraft[] }) {
                   )}
                 </span>
 
-                {(x.status === "queued" || x.status === "running") && (
+                {состояние === "идёт" && (
                   <span className="flex items-center gap-2 text-xs font-semibold text-blue-600">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     {x.progress_percent}%
                   </span>
                 )}
-                {x.status === "done" && x.result_path && (
+                {состояние === "готово" && x.result_path && (
                   <button
                     onClick={() => void скачать(x)}
                     disabled={busy === x.id}
@@ -190,7 +227,7 @@ export function PlanDraftsList({ drafts }: { drafts: PlanDraft[] }) {
                 )}
               </div>
 
-              {(x.status === "queued" || x.status === "running") && (
+              {состояние === "идёт" && (
                 <>
                   <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                     <div
@@ -209,7 +246,8 @@ export function PlanDraftsList({ drafts }: { drafts: PlanDraft[] }) {
                 </p>
               )}
             </li>
-          ))}
+          );
+          })}
         </ul>
       )}
     </section>

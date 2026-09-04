@@ -82,6 +82,7 @@ export const uz: Dictionary = {
     draftStageFile: "Fayl tayyorlanmoqda…",
     draftStageQueued: "Navbatga qo‘yilmoqda…",
     draftRunningHint: "Tahlil bir necha daqiqa davom etadi. Varaqni yopsangiz ham bo‘ladi — fayl quyidagi ro‘yxatda kutadi.",
+    draftStalled: "Tahlil uzilib qoldi va javob bermayapti. Qaytadan buyurtma bering — bu satr o‘zi yo‘qoladi.",
     draftsTitle: "O‘quv reja fayllari",
     draftsEmpty: "Darsliklardan yig‘ilgan fayllar shu yerda paydo bo‘ladi. «O‘quv reja yaratish» tugmasini bosing — model kitobni o‘qib, mavzular bilan fayl qaytaradi.",
     draftsNext: "Fayl yuklab olindi. Uni oching, mavzularni to‘g‘rilang va «O‘quv rejani yuklash» tugmasi bilan qaytaring — undan reja yaratiladi.",

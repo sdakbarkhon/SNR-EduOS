@@ -82,6 +82,7 @@ export const en: Dictionary = {
     draftStageFile: "Preparing the file…",
     draftStageQueued: "Queueing…",
     draftRunningHint: "Parsing takes a few minutes. You can close the tab — the file will wait for you in the list below.",
+    draftStalled: "Parsing broke off and is not responding. Order it again — this row will clear itself.",
     draftsTitle: "Curriculum plan files",
     draftsEmpty: "Files built from textbooks will appear here. Press “Create a curriculum plan” — the model reads the book and returns a file with topics.",
     draftsNext: "File downloaded. Open it, adjust the topics and bring it back with “Upload a curriculum plan” — the plan is created from it.",
