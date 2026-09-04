@@ -31,6 +31,13 @@ export default async function TeacherKnowledgeBasePage() {
   const { data: deptRows } = await (supabase as any).rpc("fn_my_departments");
   const departments = ((deptRows ?? []) as MyDepartment[]).filter((d) => d && d.id);
 
+  // Справочник предметов школы — для формы «Добавить книгу». Правила доступа
+  // отдают только свою школу, поэтому условие не нужно.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: catalogRows } = await (supabase as any)
+    .from("school_subjects").select("id, name").eq("is_active", true).order("name");
+  const catalog = (catalogRows ?? []) as Array<{ id: string; name: string }>;
+
   const [materialsRes, groupsRes, booksRes, libraryRes] = await Promise.all([
     safeQuery(getMaterials(supabase), [], "TeacherKnowledgeBasePage.materials"),
     safeQuery(getTeacherGroups(supabase), [], "TeacherKnowledgeBasePage.groups"),
@@ -63,6 +70,7 @@ export default async function TeacherKnowledgeBasePage() {
       books={books}
       coverUrls={coverUrls}
       libraryMaterials={libraryMaterials}
+      catalog={catalog}
       departments={departments}
     />
   );

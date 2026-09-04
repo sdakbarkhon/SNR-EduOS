@@ -9,31 +9,13 @@ import type { Book } from "@snr/core";
 import { getBookFileUrl } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
-import { subjectIconByName } from "@/lib/subject-icons";
+import { subjectIconByName, subjectGradient } from "@/lib/subject-icons";
 
 // ── Config ──────────────────────────────────────────────────────────────
-
-const SUBJECT_GRADIENTS: Record<string, [string, string]> = {
-  math:        ["#F5A623", "#E07C00"],
-  physics:     ["#39B6F5", "#1485C6"],
-  programming: ["#0EA5E9", "#0369A1"],
-  robotics:    ["#2D5BFF", "#1E3A8A"],
-  english:     ["#F0556B", "#B91C4A"],
-  informatics: ["#7A4DFF", "#5B21B6"],
-  chemistry:   ["#9B5DE5", "#6D28D9"],
-  biology:     ["#2DBE7E", "#15803D"],
-  history:     ["#B5793A", "#78350F"],
-  russian:     ["#DC2626", "#991B1B"],
-};
 
 // 04.09.2026 — своей таблицы подписей здесь больше нет. Подпись, значок и
 // цвет предмета книги отдаёт resolveSubject: сперва строка справочника школы
 // (books.catalog_id, миграция 254), и только если пары нет — словарь по слагу.
-function getBookGradient(subject: string): string {
-  const [from, to] = SUBJECT_GRADIENTS[subject] ?? ["#64748B", "#334155"];
-  return `linear-gradient(135deg, ${from}, ${to})`;
-}
-
 function getOpenText(bookType: string): string {
   switch (bookType) {
     case "Учебник":    return "Читать учебник";
@@ -118,7 +100,7 @@ function BookDetailModal({
           <div className="shrink-0 lg:w-[38%]">
             <div
               className="relative aspect-[3/4] max-h-[50vh] w-full overflow-hidden rounded-xl shadow-md"
-              style={{ background: getBookGradient(book.subject) }}
+              style={{ background: subjectGradient(style.color) }}
             >
               {coverUrl ? (
                 <img
@@ -227,7 +209,7 @@ function BookCard({
     <div className="group cursor-pointer" onClick={() => onSelect(book.id)}>
       <div
         className="relative mb-3 aspect-[3/4] w-full overflow-hidden rounded-2xl"
-        style={{ background: getBookGradient(book.subject) }}
+        style={{ background: subjectGradient(style.color) }}
       >
         {/* Uploaded cover */}
         {coverUrl && (

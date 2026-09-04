@@ -10,39 +10,16 @@ import type { Book } from "@snr/core";
 import { getBookFileUrl, deleteBook as deleteBookAction } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
-import { subjectIconByName } from "@/lib/subject-icons";
+import { subjectIconByName, subjectGradient } from "@/lib/subject-icons";
 import { parseVideoUrl } from "@/lib/video-url";
 import { mySchoolStoragePath } from "@snr/core";
 import { ModalPortal } from "@/components/ModalPortal";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-const SUBJECT_GRADIENTS: Record<string, [string, string]> = {
-  math:        ["#F5A623", "#E07C00"],
-  physics:     ["#39B6F5", "#1485C6"],
-  programming: ["#0EA5E9", "#0369A1"],
-  robotics:    ["#2D5BFF", "#1E3A8A"],
-  english:     ["#F0556B", "#B91C4A"],
-  informatics: ["#7A4DFF", "#5B21B6"],
-  chemistry:   ["#9B5DE5", "#6D28D9"],
-  biology:     ["#2DBE7E", "#15803D"],
-  history:     ["#B5793A", "#78350F"],
-  russian:     ["#DC2626", "#991B1B"],
-};
-
-// Пачка «предметы книг»: раньше был отдельный хардкод-дубль (9 предметов,
-// без "русский", с расхождением в лейблах вроде "Английский" vs канонiческого
-// "Английский язык") — теперь берём labels из единого конфига @snr/core
-// (packages/core/src/config/subjects.ts), как того требует CLAUDE.md §6
-// ("конфиг цвет+иконка на предмет — один файл"). Полный набор (не только
-// 5 отбираемых в форме "Добавить книгу", см. BOOK_SUBJECT_KEYS ниже) —
-// нужен, чтобы карточки/бейджи существующих книг с любым subject корректно
-// резолвили label, а не падали на raw-key fallback.
-function getBookGradient(subject: string): string {
-  const [from, to] = SUBJECT_GRADIENTS[subject] ?? ["#64748B", "#334155"];
-  return `linear-gradient(135deg, ${from}, ${to})`;
-}
-
+// 05.09.2026 — записи про «список предметов книг» здесь больше нет: список
+// приходит из справочника школы (проп catalog), а подпись существующей книги
+// даёт resolveSubject по её ссылке на справочник.
 function getOpenText(bookType: string): string {
   switch (bookType) {
     case "Учебник":    return "Читать учебник";
@@ -67,8 +44,19 @@ const BOOK_TYPES = ["Учебник", "Конспект", "Сборник", "С�
 // Программирование — намеренно исключены отсюда (labels для НИХ всё равно
 // остаются в SUBJECT_LABELS выше, на случай если где-то в данных встретится
 // старое значение — только сам выбор в форме сужен).
-const BOOK_SUBJECT_KEYS = ["programming", "robotics", "math", "english", "russian"] as const;
-const SUBJECTS = BOOK_SUBJECT_KEYS.map((value) => ({ value, label: resolveSubject({ slug: value }).label }));
+/**
+ * ПРЕДМЕТ КНИГИ — ИЗ СПРАВОЧНИКА ШКОЛЫ. 05.09.2026.
+ *
+ * Здесь лежал список из пяти слагов: programming, robotics, math, english,
+ * russian. Школа со своим предметом («Схемотехника», «Science») завести по
+ * нему книгу не могла вовсе — его просто не было в выпадающем списке.
+ *
+ * Теперь список — это справочник школы, а книга запоминает ССЫЛКУ на строку
+ * справочника (books.catalog_id, миграция 254). Текстовая копия названия
+ * по-прежнему пишется в books.subject: колонка NOT NULL и уходит в конце
+ * цепочки заходов.
+ */
+type CatalogItem = { id: string; name: string };
 
 // ── TeacherBookDetailModal ────────────────────────────────────────────
 
@@ -120,7 +108,7 @@ function TeacherBookDetailModal({
             <div className="w-[38%] shrink-0">
               <div
                 className="relative aspect-[3/4] w-full overflow-hidden rounded-xl shadow-md"
-                style={{ background: getBookGradient(book.subject) }}
+                style={{ background: subjectGradient(style.color) }}
               >
                 {coverUrl ? (
                   <img
@@ -211,16 +199,19 @@ function Toast({ msg, onClose }: { msg: string; onClose: () => void }) {
 // по url/расширению (lib/material-kind.ts), тем же, что и везде.
 function BookVideoLinkModal({
   teacherId,
+  catalog,
   onClose,
   onSuccess,
 }: {
   teacherId: string;
+  catalog: CatalogItem[];
   onClose: () => void;
   onSuccess: (title: string) => void;
 }) {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [subject, setSubject] = useState<string>(BOOK_SUBJECT_KEYS[0]);
+  const [subjectId, setSubjectId] = useState<string>(catalog[0]?.id ?? "");
+  const выбранный = catalog.find((c) => c.id === subjectId) ?? null;
   const [bookType, setBookType] = useState<typeof BOOK_TYPES[number]>("Учебник");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
@@ -240,7 +231,8 @@ function BookVideoLinkModal({
       await insertBook(createClient(), {
         title: title.trim(),
         author: author.trim() || null,
-        subject,
+        subject: выбранный?.name ?? "",
+        catalog_id: выбранный?.id ?? null,
         book_type: bookType,
         description: description.trim() || null,
         cover_storage_path: null,
@@ -289,8 +281,8 @@ function BookVideoLinkModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-slate-700">Предмет</label>
-                <select value={subject} onChange={(e) => setSubject(e.target.value)} disabled={saving} className={field}>
-                  {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} disabled={saving} className={field}>
+                  {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
@@ -407,16 +399,19 @@ function SuccessModal({
 
 function UploadModal({
   teacherId,
+  catalog,
   onClose,
   onSuccess,
 }: {
   teacherId: string;
+  catalog: CatalogItem[];
   onClose: () => void;
   onSuccess: (title: string) => void;
 }) {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [subject, setSubject] = useState<string>(BOOK_SUBJECT_KEYS[0]);
+  const [subjectId, setSubjectId] = useState<string>(catalog[0]?.id ?? "");
+  const выбранный = catalog.find((c) => c.id === subjectId) ?? null;
   const [bookType, setBookType] = useState<typeof BOOK_TYPES[number]>("Учебник");
   const [description, setDescription] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -475,7 +470,8 @@ function UploadModal({
       await insertBook(sb, {
         title: title.trim(),
         author: author.trim() || null,
-        subject,
+        subject: выбранный?.name ?? "",
+        catalog_id: выбранный?.id ?? null,
         book_type: bookType,
         description: description.trim() || null,
         cover_storage_path: coverPath,
@@ -541,13 +537,13 @@ function UploadModal({
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-slate-700">Предмет</label>
                 <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
+                  value={subjectId}
+                  onChange={(e) => setSubjectId(e.target.value)}
                   disabled={uploading}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
                 >
-                  {SUBJECTS.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                  {catalog.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
@@ -686,11 +682,14 @@ export function TeacherBooksView({
   initialBooks,
   initialTeacherId,
   coverUrls,
+  catalog,
   hideHeading,
 }: {
   initialBooks: Book[];
   initialTeacherId: string;
   coverUrls: Record<string, string>;
+  /** Справочник предметов школы — список для формы «Добавить книгу». */
+  catalog: CatalogItem[];
   hideHeading?: boolean;
 }) {
   const router = useRouter();
@@ -832,6 +831,7 @@ export function TeacherBooksView({
       {showUpload && (
         <UploadModal
           teacherId={initialTeacherId}
+          catalog={catalog}
           onClose={() => setShowUpload(false)}
           onSuccess={handleUploadSuccess}
         />
@@ -839,6 +839,7 @@ export function TeacherBooksView({
       {showVideoLink && (
         <BookVideoLinkModal
           teacherId={initialTeacherId}
+          catalog={catalog}
           onClose={() => setShowVideoLink(false)}
           onSuccess={handleUploadSuccess}
         />
@@ -933,7 +934,7 @@ export function TeacherBooksView({
                   {/* Cover */}
                   <div
                     className="relative mb-3 aspect-[3/4] w-full overflow-hidden rounded-2xl"
-                    style={{ background: `linear-gradient(135deg, ${(SUBJECT_GRADIENTS[book.subject] ?? ["#64748B","#334155"])[0]}, ${(SUBJECT_GRADIENTS[book.subject] ?? ["#64748B","#334155"])[1]})` }}
+                    style={{ background: subjectGradient(style.color) }}
                   >
                     {/* Cover image */}
                     {coverUrl && (

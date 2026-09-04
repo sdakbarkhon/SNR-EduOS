@@ -1157,7 +1157,11 @@ export const getTeacherGroupSubjects = async (db: Db): Promise<TeacherGroupSubje
 export const getTeacherGroups = (db: Db) =>
   db
     .from("groups")
-    .select("*, enrolled:student_groups(student_id)")
+    // 05.09.2026 — вместе с группой приходят её НАЗНАЧЕНИЯ. Экранам нужен
+    // предмет группы, а колонка groups.subject его больше не знает: она
+    // устарела (миграция 256) и у новых групп пуста. Настоящие предметы
+    // лежат в subjects, их и берём.
+    .select("*, enrolled:student_groups(student_id), subjects(id, name, is_active, is_stub)")
     .order("name")
     .then(unwrap);
 
@@ -5238,7 +5242,12 @@ export const insertBook = async (
   input: {
     title: string;
     author: string | null;
+    /** Название предмета текстом — устаревшая копия, уходит вместе со слагом
+     *  в конце цепочки заходов. Пишется ради колонки NOT NULL. */
     subject: string;
+    /** Миграция 254 — предмет книги строкой справочника школы. Именно по ней
+     *  книга показывается: подпись, значок и цвет берутся отсюда. */
+    catalog_id?: string | null;
     book_type: string;
     description: string | null;
     cover_storage_path: string | null;
@@ -5250,7 +5259,12 @@ export const insertBook = async (
     uploaded_by: string;
   },
 ): Promise<Book> => {
-  const { data, error } = await db
+  // Приведение — из-за catalog_id: сгенерированный Database-тип его не знает,
+  // и он там не появится, пока типы не перегенерируют (их намеренно держат
+  // отставшими с миграции 171, см. school_subjects). Тот же приём, что уже
+  // применён к другим записям в таблицы после 171.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
     .from("books")
     .insert(input)
     .select("*")

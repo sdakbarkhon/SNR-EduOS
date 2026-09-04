@@ -110,3 +110,29 @@ export function subjectIconByName(name: string | null | undefined): LucideIcon {
   if (!ключ) return BookOpen;
   return LUCIDE_ICONS[ключ] ?? LUCIDE_ICONS[KEBAB_TO_PASCAL[ключ.toLowerCase()] ?? ""] ?? BookOpen;
 }
+
+/**
+ * ГРАДИЕНТ ОБЛОЖКИ КНИГИ ИЗ ЦВЕТА ПРЕДМЕТА. 05.09.2026.
+ *
+ * Своя таблица «слаг → две краски» жила в ДВУХ файлах — на полке ученика и на
+ * полке учителя, — и обе знали только пять-шесть слагов. Книга школьного
+ * предмета («Схемотехника») получала серую обложку, а школа, сменившая цвет
+ * предмета, на обложке этого не видела.
+ *
+ * Теперь красок не две, а одна: цвет предмета из справочника. Вторая
+ * получается затемнением — тем же приёмом, что был зашит в прежней таблице
+ * (там пары вроде #F5A623 → #E07C00 отличались примерно на треть яркости).
+ */
+const ЗАТЕМНЕНИЕ = 0.62;
+
+export function subjectGradient(color: string | null | undefined): string {
+  const ц = (color ?? "").trim();
+  const m = /^#([0-9a-f]{6})$/i.exec(ц);
+  if (!m) return "linear-gradient(135deg, #64748B, #334155)";
+  const n = parseInt(m[1]!, 16);
+  const тень = [16, 8, 0]
+    .map((сдвиг) => Math.round(((n >> сдвиг) & 0xff) * ЗАТЕМНЕНИЕ))
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("");
+  return `linear-gradient(135deg, ${ц}, #${тень})`;
+}

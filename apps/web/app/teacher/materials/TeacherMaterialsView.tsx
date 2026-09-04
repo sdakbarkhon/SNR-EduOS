@@ -79,9 +79,31 @@ function formatDate(iso: string): string {
 export type TeacherGroup = {
   id: string;
   name: string;
+  /** Устаревшая колонка «предмет группы» (миграция 256): у новых групп
+   *  пуста, читать её нельзя. Предметы — в `subjects` ниже. */
   subject: string;
   teacher_id: string | null;
+  /** Назначения группы — настоящие её предметы. */
+  subjects?: Array<{ id: string; name: string; is_active: boolean; is_stub: boolean }>;
 };
+
+/**
+ * ПРЕДМЕТЫ ГРУППЫ ДЛЯ ФОРМЫ МАТЕРИАЛА. 05.09.2026.
+ *
+ * Раньше в материал писался `selectedGroup.subject` — та самая колонка
+ * «группа = один курс». У класса предметов пять-шесть, и материал по русскому
+ * получал слово «Программирование»; после миграции 256 у новых групп там
+ * пусто, и материал остался бы вовсе без предмета и без фильтра.
+ *
+ * Теперь предмет берётся из назначений группы: один — подставляется молча,
+ * несколько — учитель выбирает сам. Спрашивать там, где ответ один, незачем.
+ */
+export function subjectsOfGroup(g: TeacherGroup | undefined): string[] {
+  return (g?.subjects ?? [])
+    .filter((s) => s.is_active && !s.is_stub)
+    .map((s) => s.name)
+    .sort((a, b) => a.localeCompare(b));
+}
 
 // ── Toast ─────────────────────────────────────────────────────────────
 
@@ -121,6 +143,13 @@ function UploadModal({
   const dropRef = useRef<HTMLDivElement>(null);
 
   const selectedGroup = groups.find((g) => g.id === groupId);
+  const предметыГруппы = subjectsOfGroup(selectedGroup);
+  const [subject, setSubject] = useState("");
+  // Группу сменили — прежний выбор предмета к ней отношения не имеет.
+  useEffect(() => { setSubject(""); }, [groupId]);
+  const выбранныйПредмет = предметыГруппы.includes(subject)
+    ? subject
+    : (предметыГруппы.length === 1 ? предметыГруппы[0]! : "");
 
   function handleFileDrop(e: React.DragEvent) {
     e.preventDefault();
@@ -176,7 +205,7 @@ function UploadModal({
         group_id: groupId,
         title: title.trim(),
         description: description.trim() || null,
-        subject: selectedGroup?.subject ?? "",
+        subject: выбранныйПредмет,
         lesson_id: null,
         file_type: file.type || `application/${ext}`,
         storage_path: storagePath,
@@ -254,6 +283,27 @@ function UploadModal({
               </select>
             </div>
 
+            {/* Предмет. Один у группы — подставляется молча, несколько —
+                выбирает учитель. Список из назначений группы, а не из
+                устаревшей колонки groups.subject. */}
+            {предметыГруппы.length > 1 && (
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Предмет <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={выбранныйПредмет}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="" disabled>Выберите предмет</option>
+                  {предметыГруппы.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* File drop zone */}
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">
@@ -322,7 +372,7 @@ function UploadModal({
               </button>
               <button
                 type="submit"
-                disabled={uploading || !title.trim() || !groupId || !file}
+                disabled={uploading || !title.trim() || !groupId || !file || !выбранныйПредмет}
                 className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
               >
                 {uploading ? "Загружаем…" : "Загрузить"}
@@ -371,6 +421,13 @@ function VideoLinkModal({
   const [error, setError] = useState<string | null>(null);
 
   const selectedGroup = groups.find((g) => g.id === groupId);
+  const предметыГруппы = subjectsOfGroup(selectedGroup);
+  const [subject, setSubject] = useState("");
+  // Группу сменили — прежний выбор предмета к ней отношения не имеет.
+  useEffect(() => { setSubject(""); }, [groupId]);
+  const выбранныйПредмет = предметыГруппы.includes(subject)
+    ? subject
+    : (предметыГруппы.length === 1 ? предметыГруппы[0]! : "");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -387,7 +444,7 @@ function VideoLinkModal({
         group_id: groupId,
         title: title.trim(),
         description: description.trim() || null,
-        subject: selectedGroup?.subject ?? "",
+        subject: выбранныйПредмет,
         lesson_id: null,
         // Строка-ссылка: файловых полей нет намеренно. getMaterialUrl отдаёт
         // link_url ПЕРЕД storage_path, поэтому запись с обоими полями сделала
@@ -463,6 +520,27 @@ function VideoLinkModal({
               </select>
             </div>
 
+            {/* Предмет. Один у группы — подставляется молча, несколько —
+                выбирает учитель. Список из назначений группы, а не из
+                устаревшей колонки groups.subject. */}
+            {предметыГруппы.length > 1 && (
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Предмет <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={выбранныйПредмет}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="" disabled>Выберите предмет</option>
+                  {предметыГруппы.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">
                 Ссылка на видео <span className="text-red-500">*</span>
@@ -491,7 +569,7 @@ function VideoLinkModal({
               </button>
               <button
                 type="submit"
-                disabled={saving || !title.trim() || !groupId || !url.trim()}
+                disabled={saving || !title.trim() || !groupId || !url.trim() || !выбранныйПредмет}
                 className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
               >
                 {saving ? "Сохраняем…" : "Добавить"}

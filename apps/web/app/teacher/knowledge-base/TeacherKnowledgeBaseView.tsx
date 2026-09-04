@@ -20,6 +20,7 @@ export function TeacherKnowledgeBaseView({
   coverUrls,
   libraryMaterials,
   departments,
+  catalog,
 }: {
   materials: MaterialWithGroup[];
   groups: TeacherGroup[];
@@ -29,6 +30,8 @@ export function TeacherKnowledgeBaseView({
   libraryMaterials: LibraryMaterialWithDetails[];
   /** Кафедры учителя (fn_my_departments). */
   departments: MyDepartment[];
+  /** Справочник предметов школы — для формы «Добавить книгу». */
+  catalog: Array<{ id: string; name: string }>;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).knowledgeBase;
@@ -67,7 +70,7 @@ export function TeacherKnowledgeBaseView({
         <TeacherMaterialsView materials={materials} groups={groups} initialTeacherId={initialTeacherId} hideHeading />
       </div>
       <div className={tab === "library" ? "" : "hidden"}>
-        <TeacherBooksView initialBooks={books} initialTeacherId={initialTeacherId} coverUrls={coverUrls} hideHeading />
+        <TeacherBooksView initialBooks={books} initialTeacherId={initialTeacherId} coverUrls={coverUrls} catalog={catalog} hideHeading />
       </div>
       <div className={tab === "teacherLibrary" ? "" : "hidden"}>
         <TeacherLibraryTabView
