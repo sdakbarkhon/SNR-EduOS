@@ -18,6 +18,8 @@ export const ru: Dictionary = {
     close: "Закрыть",
     loggingOut: "Выход из системы...",
     andMore: "+ ещё {n}",
+    schoolSwitchTitle: "Школа",
+    schoolSwitchDenied: "Переключиться не вышло: похоже, в этой школе вы больше не числитесь. Обновите страницу.",
   },
   status: {
     now: "Сейчас",

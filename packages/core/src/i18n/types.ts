@@ -25,6 +25,10 @@ export interface Dictionary {
     loggingOut: string; // "Выход из системы..." — полноэкранный оверлей при клике "Выйти"
     /** «+ ещё {n}» — хвост перечисления, когда всё не влезает. */
     andMore: string;
+    /** Заголовок переключателя школы в шапке. Виден только тем, у кого школ больше одной. */
+    schoolSwitchTitle: string;
+    /** Отказ базы: в этой школе человек не числится. */
+    schoolSwitchDenied: string;
   };
   status: Record<StatusKey, string>;
   nav: {

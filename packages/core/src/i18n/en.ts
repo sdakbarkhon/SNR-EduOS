@@ -18,6 +18,8 @@ export const en: Dictionary = {
     close: "Close",
     loggingOut: "Signing out...",
     andMore: "+{n} more",
+    schoolSwitchTitle: "School",
+    schoolSwitchDenied: "Could not switch: it looks like you no longer work at this school. Reload the page.",
   },
   status: {
     now: "Now",

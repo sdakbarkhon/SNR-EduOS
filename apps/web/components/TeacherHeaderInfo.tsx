@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { Avatar } from "./Avatar";
+import { SchoolSwitcher } from "./SchoolSwitcher";
+import { мои_школы } from "@/lib/my-schools";
 
 /**
  * Fetches teacher name/avatar/subject and renders the topbar identity block.
@@ -14,8 +16,16 @@ export async function TeacherHeaderInfo() {
   let teacherName = "";
   let avatarUrl: string | null = null;
   let teacherSubtitle = "";
+  // ПЕРЕКЛЮЧАТЕЛЬ ШКОЛЫ. Список — служебным ключом по привязкам самого
+  // человека (названий чужих школ он не видит), а какая выбрана СЕЙЧАС —
+  // вопрос к функции под его же сессией: там и хранимый выбор, и запасной ход
+  // на домашнюю школу. Второй копии этих правил в коде не заводим.
+  let школы: Array<{ id: string; name: string }> = [];
+  let выбрана: string | null = null;
+  let учительId: string | null = null;
   try {
     const teacher = await getMyTeacher(supabase);
+    учительId = teacher.id;
     teacherName = teacher.full_name ?? "";
     avatarUrl = teacher.avatar_url ?? null;
     // ПОДПИСЬ — ПРЕДМЕТЫ ИЗ НАЗНАЧЕНИЙ. 06.09.2026.
@@ -39,14 +49,32 @@ export async function TeacherHeaderInfo() {
     console.error("[TeacherHeaderInfo] getMyTeacher failed:", err);
   }
 
+  try {
+    if (учительId) {
+      // Список пуст у всех, у кого школа одна, — и тогда второго запроса не
+      // будет вовсе: спрашивать, какая школа выбрана, незачем.
+      школы = await мои_школы(учительId);
+      if (школы.length >= 2) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: активная } = await (supabase as any).rpc("current_school_id");
+        выбрана = (активная as string | null) ?? null;
+      }
+    }
+  } catch (err) {
+    console.error("[TeacherHeaderInfo] школы не прочитались:", err);
+  }
+
   return (
-    <div className="flex items-center gap-3 rounded-[16px] border border-white/40 bg-white/60 py-2 pl-2 pr-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-xl">
+    <div className="flex items-center gap-2">
+      <SchoolSwitcher schools={школы} activeId={выбрана} />
+      <div className="flex items-center gap-3 rounded-[16px] border border-white/40 bg-white/60 py-2 pl-2 pr-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-xl">
       <Avatar name={teacherName || "?"} src={avatarUrl ?? undefined} size={36} />
       <div className="hidden max-w-[200px] flex-col sm:flex">
         <span className="truncate text-sm font-semibold leading-tight text-gray-800">{teacherName}</span>
         {teacherSubtitle && (
           <span className="mt-0.5 truncate whitespace-nowrap text-[10px] font-medium leading-tight text-gray-500">{teacherSubtitle}</span>
         )}
+      </div>
       </div>
     </div>
   );

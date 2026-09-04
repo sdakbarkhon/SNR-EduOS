@@ -18,6 +18,8 @@ export const uz: Dictionary = {
     close: "Yopish",
     loggingOut: "Chiqilmoqda...",
     andMore: "+ yana {n}",
+    schoolSwitchTitle: "Maktab",
+    schoolSwitchDenied: "O‘tib bo‘lmadi: siz bu maktabda endi ishlamayotganga o‘xshaysiz. Sahifani yangilang.",
   },
   status: {
     now: "Hozir",
