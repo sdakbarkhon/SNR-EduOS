@@ -1,30 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  MapPin, User, ChevronRight, BookOpen,
-  Calculator, Globe, Languages, BookText, Scroll, Map, Leaf, Atom,
-  FlaskConical, Monitor, Code, Bot, Dumbbell, Music, Palette, Hammer,
-  TreePine, Users, Library, Lightbulb, Target, Rocket,
-} from "lucide-react";
+import { MapPin, User, ChevronRight } from "lucide-react";
 import type { LessonWithSubject } from "@snr/core";
 import { cn } from "@/lib/cn";
+import { subjectIconByName } from "@/lib/subject-icons";
 
 // Промт «скорость», Задача 7: `import * as Icons from "lucide-react"` тянул
 // весь пакет (1000+ иконок, самый тяжёлый собственный код любого роута —
 // 30.3 kB на /teacher/lessons) ради иконки по имени-строке из subjects.icon.
-// Эти имена всегда приходят из SUBJECT_DEFAULTS (packages/core/queries/
-// subjects.ts) — конечный список, явная карта вместо wildcard-импорта.
+// Явный конечный реестр вместо wildcard-импорта — это правило осталось.
 //
-// Z.2.2: реестр синхронизирован с lib/subject-icons.ts::LUCIDE_ICONS. Раньше
-// они расходились: здесь не было Library (её предлагал пикер в админке) и
-// Lightbulb/Target/Rocket, из-за чего выбранная иконка молча подменялась на
-// BookOpen. Два реестра надо держать одинаковыми.
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string; color?: string }>> = {
-  Calculator, BookOpen, Globe, Languages, BookText, Scroll, Map, Leaf, Atom,
-  FlaskConical, Monitor, Code, Bot, Dumbbell, Music, Palette, Hammer,
-  TreePine, Users, Library, Lightbulb, Target, Rocket,
-};
+// 04.09.2026 — реестр здесь больше не свой: он один на весь веб, в
+// lib/subject-icons. Держать «два одинаковыми» не пришлось: их и так уже
+// развело трижды, последний раз на значке Library.
+// 04.09.2026 — свой ICON_MAP убран, реестр один: lib/subject-icons.
+// Он был третьей копией того же списка, и копии уже расходились: значок
+// Library предлагался админу, но ни в одном реестре его не было.
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,10 +35,8 @@ function calcEndTime(startsAt: string, durationMin: number | null): string | nul
 function LucideIcon({ name, size = 16, className, color }: {
   name: string; size?: number; className?: string; color?: string;
 }) {
-  const Comp = ICON_MAP[name];
-  return Comp
-    ? <Comp size={size} className={className} color={color} />
-    : <BookOpen size={size} className={className} color={color} />;
+  const Comp = subjectIconByName(name);
+  return <Comp size={size} className={className} color={color} />;
 }
 
 function initials(name: string): string {

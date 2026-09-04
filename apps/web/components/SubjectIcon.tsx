@@ -1,51 +1,17 @@
-import {
-  Atom,
-  Bot,
-  BookOpen,
-  Calculator,
-  CircuitBoard,
-  Code2,
-  FlaskConical,
-  Globe,
-  Languages,
-  Leaf,
-  Microscope,
-  Monitor,
-  Music,
-  Palette,
-  Scroll,
-  TreePine,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
 import { getSubjectStyle } from "@snr/core";
+import { subjectIconByName } from "@/lib/subject-icons";
+import type { LucideIcon } from "lucide-react";
 
-const ICONS: Record<string, LucideIcon> = {
-  bot: Bot,
-  monitor: Monitor,
-  calculator: Calculator,
-  atom: Atom,
-  languages: Languages,
-  scroll: Scroll,
-  leaf: Leaf,
-  "flask-conical": FlaskConical,
-  "book-open": BookOpen,
-  "code-2": Code2,
-  // 04.09.2026 — семь предметов, дописанных в словарь. Без строки здесь
-  // значок молча падает на книгу: не поломка, но и не то, что имели в виду.
-  microscope: Microscope,
-  "circuit-board": CircuitBoard,
-  "tree-pine": TreePine,
-  palette: Palette,
-  music: Music,
-  globe: Globe,
-  users: Users,
-};
+// 04.09.2026 — СВОЕГО РЕЕСТРА ЗНАЧКОВ ЗДЕСЬ БОЛЬШЕ НЕТ.
+//
+// Он был третьим по счёту и единственным в написании kebab-case, тогда как в
+// базе значки лежат PascalCase. Разбор — в шапке lib/subject-icons.ts; сюда
+// реестр не вернётся, ему место одно.
 
 /** Resolves a subject to its lucide icon + color, no wrapper/background — for embedding inside an already-styled container (colored tile, gradient cover). */
 export function resolveSubjectIcon(subject: string | null): { Icon: LucideIcon; color: string } {
   const s = getSubjectStyle(subject);
-  return { Icon: ICONS[s.icon] ?? BookOpen, color: s.color };
+  return { Icon: subjectIconByName(s.icon), color: s.color };
 }
 
 export function SubjectIcon({
@@ -56,7 +22,7 @@ export function SubjectIcon({
   size?: number;
 }) {
   const s = getSubjectStyle(subject);
-  const Icon = ICONS[s.icon] ?? BookOpen;
+  const Icon = subjectIconByName(s.icon);
   return (
     <span
       className="inline-flex items-center justify-center"

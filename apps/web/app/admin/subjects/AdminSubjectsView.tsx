@@ -6,7 +6,7 @@ import { getDictionary, SUBJECT_DEFAULTS, subjects as SUBJECT_CONFIG } from "@sn
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
-import { LUCIDE_ICONS } from "@/lib/subject-icons";
+import { LUCIDE_ICONS, ICON_NAMES } from "@/lib/subject-icons";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
 import {
@@ -51,12 +51,10 @@ const KNOWN_SUBJECT_NAMES = Object.values(SUBJECT_CONFIG).map((s) => s.label);
 /** Служебное значение пункта «своё название» — им не может быть настоящее имя. */
 const CUSTOM_NAME = "__custom__";
 
-const ICON_OPTIONS = [
-  "Calculator", "BookOpen", "Globe", "Languages", "BookText", "Scroll",
-  "Map", "Leaf", "Atom", "FlaskConical", "Monitor", "Code", "Bot",
-  "Dumbbell", "Music", "Palette", "Hammer", "TreePine", "Library",
-  "Users", "Lightbulb", "Target", "Rocket",
-];
+// 04.09.2026 — список берётся из реестра, а не пишется рядом с ним. Пока он
+// был своим, админу предлагали значки, которых приложение не умело рисовать:
+// выбранная Library молча становилась книгой.
+const ICON_OPTIONS = ICON_NAMES;
 
 const COLOR_OPTIONS = [
   "#F5A623", "#EF4444", "#F97316", "#F0556B", "#F43F5E", "#B5793A",
