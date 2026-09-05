@@ -3346,7 +3346,6 @@ export const ru: Dictionary = {
     workUsually: "обычно около {n} с",
     workStepModel: "ИИ составляет этапы урока",
     workStepSaving: "Сохраняем этапы в урок",
-    workStepMaterials: "Прикрепляем материалы из библиотеки",
     workStepHomework: "ИИ составляет задание",
     workOf: "{i} из {n}",
     chat: {

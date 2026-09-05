@@ -3459,7 +3459,6 @@ export interface Dictionary {
     workUsually: string;
     workStepModel: string;
     workStepSaving: string;
-    workStepMaterials: string;
     workStepHomework: string;
     workOf: string;
     chat: {

@@ -94,8 +94,9 @@ export function AiGenerateStagesModal({
   lessonId: string;
   lessonTopic: string | null;
   lessonDurationMin: number;
-  /** Пачка «240 пустых уроков», ЧАСТЬ 3 — для финального шага "прицепить
-      материалы БЗ по предмету" после генерации этапов (см. addToLesson). */
+  /** Автор этапов: уходит в applyGeneratedStages как uploaded_by. Прежде
+      здесь стояло «для финального шага прицепить материалы БЗ» — того шага
+      больше нет (06.09.2026). */
   teacherId: string;
   subjectName: string | null;
   onClose: () => void;
@@ -128,10 +129,13 @@ export function AiGenerateStagesModal({
 
   // Настоящие шаги работы, а не крутящийся кружок.
   //
-  // Шага три, и только первый непрозрачен: это один запрос к серверу, внутри
-  // которого модель и генерация картинок. Второй и третий клиент выполняет
-  // сам, по одному этапу за раз, поэтому у них есть точный счёт «3 из 7».
-  // Типичная длительность первого берётся из настоящих замеров учёта.
+  // Шага ДВА, и только первый непрозрачен: это один запрос к серверу, внутри
+  // которого модель и генерация картинок. Второй клиент выполняет сам, по
+  // одному этапу за раз, поэтому у него есть точный счёт «3 из 7». Типичная
+  // длительность первого берётся из настоящих замеров учёта.
+  //
+  // Третьим стоял «Прикрепляем материалы из библиотеки» — ушёл 06.09.2026
+  // вместе с самим прикреплением.
   const [workStep, setWorkStep] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [totalToSave, setTotalToSave] = useState(0);
@@ -197,7 +201,6 @@ export function AiGenerateStagesModal({
           setTotalToSave(total);
         },
       });
-      setWorkStep(2);
       setPhase("added");
       setTimeout(() => { onAdded(); onClose(); }, 1200);
     } catch (err) {
@@ -381,7 +384,10 @@ export function AiGenerateStagesModal({
                           ? d.ai.workOf.replace("{i}", String(savedCount)).replace("{n}", String(totalToSave))
                           : undefined,
                       },
-                      { key: "materials", label: d.ai.workStepMaterials },
+                      /* Третьего шага «Прикрепляем материалы из библиотеки»
+                         здесь больше нет: вместе с ним убрано и само
+                         прикрепление (06.09.2026). Шаг рисовался как задумка,
+                         хотя учитель книг не просил. */
                     ] as WorkStep[]}
                   />
                 </div>

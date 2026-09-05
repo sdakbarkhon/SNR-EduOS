@@ -13,7 +13,7 @@
  *
  * ПОЧЕМУ В ЯДРЕ, А НЕ В apps/web. Всё, что делает функция, — это вызовы
  * запросов ядра: addLessonStage, replaceQuizQuestions,
- * linkLessonMaterialFromKnowledgeBase, deleteLessonStage. Тащить их наружу
+ * deleteLessonStage. Тащить их наружу
  * ради модуля в приложении незачем, а разборщик живёт на сервере и клиента
  * не имеет.
  */
@@ -29,7 +29,6 @@ import type {
 import {
   addLessonStage,
   deleteLessonStage,
-  linkLessonMaterialFromKnowledgeBase,
   replaceQuizQuestions,
 } from "../queries";
 
@@ -97,68 +96,34 @@ export async function removeMiddleStages(db: Db, lessonId: string): Promise<numb
   return ids.length;
 }
 
-/**
- * Прицепить к уроку до трёх книг библиотеки того же предмета.
+/*
+ * ═══ МАШИНА БОЛЬШЕ НЕ ПРИЦЕПЛЯЕТ КНИГИ. 06.09.2026 ════════════════════════
  *
- * Модель здесь не зовётся вовсе: сопоставление идёт по названию предмета →
- * ключу → `books.subject`. Идемпотентно: если у урока уже есть материал из
- * библиотеки, не трогает.
+ * Здесь стояла attachBooksFromKnowledgeBase — она цепляла к уроку до ТРЁХ книг
+ * библиотеки того же предмета сразу после наполнения этапов.
+ *
+ * ЭТО ВТОРОЕ МЕСТО. Первое сняли 03.09.2026 (коммит 6c564568) — там карточка
+ * заводилась в материалах группы на каждый этап со слайдами. Не помогло:
+ * материал продолжал появляться, потому что цепляла ещё и эта функция, и
+ * замер это подтвердил — шесть книг прицеплено после того коммита, две из них
+ * пятого сентября.
+ *
+ * ПОЧЕМУ УБРАНО, А НЕ СУЖЕНО. Учитель не просил эти книги. Он просил наполнить
+ * урок этапами; всё, что появляется сверх просьбы, он потом разбирает руками —
+ * и разбирал: 254 материала уроков в базе, и ВСЕ до одного прицеплены этой
+ * функцией.
+ *
+ * РУЧНОЕ ПРИКРЕПЛЕНИЕ НЕ ТРОНУТО. linkLessonMaterialFromKnowledgeBase жива и
+ * зовётся из выбора материала учителем — он по-прежнему может добавить к уроку
+ * что угодно, включая книгу библиотеки.
  */
-async function attachBooksFromKnowledgeBase(
-  db: Db,
-  lessonId: string,
-  teacherId: string,
-  subjectName: string,
-  schoolId?: string,
-): Promise<number> {
-  // 06.09.2026 — книги ищутся по СПРАВОЧНИКУ, а не по слагу из словаря кода:
-  // словарь снесён, а у книги с миграции 254 есть ссылка на предмет школы.
-  // Предмета с таким названием в школе нет — прицеплять нечего.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dbCat = db as any;
-  let catQuery = dbCat.from("school_subjects").select("id").eq("name", subjectName);
-  if (schoolId) catQuery = catQuery.eq("school_id", schoolId);
-  const { data: catRow } = await catQuery.maybeSingle();
-  const catalogId = (catRow as { id: string } | null)?.id ?? null;
-  if (!catalogId) return 0;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db2 = db as any;
-  const { data: existing } = await db2
-    .from("lesson_materials").select("id")
-    .eq("lesson_id", lessonId).eq("kb_bucket", "books").limit(1);
-  if (existing?.length) return 0;
-
-  const { data: books } = await db2
-    .from("books")
-    .select("id, title, file_storage_path, file_size_bytes")
-    .eq("catalog_id", catalogId)
-    // Миграция 175 — в библиотеке есть книги-видеоссылки без файла. Сюда идёт
-    // путь в хранилище, поэтому берём только книги-файлы: иначе к уроку молча
-    // прицепился бы материал с пустым путём.
-    .not("file_storage_path", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(3);
-  if (!books?.length) return 0;
-
-  let прицеплено = 0;
-  for (const b of books as Array<{ title: string; file_storage_path: string; file_size_bytes: number }>) {
-    await linkLessonMaterialFromKnowledgeBase(db, {
-      lessonId, teacherId, title: b.title, storagePath: b.file_storage_path,
-      kbBucket: "books", fileSizeBytes: b.file_size_bytes, schoolId,
-    });
-    прицеплено += 1;
-  }
-  return прицеплено;
-}
 
 export type ApplyStagesResult = {
   /** Сколько этапов вставлено. */
   inserted: number;
   /** Сколько этапов середины стёрто перед вставкой (перезаполнение). */
   removed: number;
-  /** Сколько книг библиотеки прицеплено. */
-  booksAttached: number;
+  /* Поля booksAttached здесь больше нет: машина книг не цепляет (06.09.2026). */
 };
 
 /**
@@ -167,11 +132,10 @@ export type ApplyStagesResult = {
  * ПОРЯДОК ВАЖЕН и повторяет тот, что был в окне:
  *   1. при перезаполнении — стереть середину;
  *   2. пересчитать длительности под урок;
- *   3. вставить этапы по одному, вопросы квиза — сразу за своим этапом;
- *   4. прицепить книги библиотеки.
+ *   3. вставить этапы по одному, вопросы квиза — сразу за своим этапом.
  *
- * Книги — последним и «как получится»: этапы к этому моменту уже вставлены, и
- * сбой на книгах не должен выглядеть как сбой наполнения.
+ * Четвёртым шагом сюда цеплялись книги библиотеки — убрано 06.09.2026, см.
+ * пояснение выше.
  */
 export async function applyGeneratedStages(
   db: Db,
@@ -180,7 +144,15 @@ export async function applyGeneratedStages(
     teacherId: string;
     /** Длительность урока — под неё раскладываются минуты этапов. */
     lessonMinutes: number;
-    /** Название предмета: по нему подбираются книги библиотеки. */
+    /**
+     * Название предмета. ВНУТРИ БОЛЬШЕ НЕ ЧИТАЕТСЯ: по нему подбирались книги
+     * библиотеки, и вместе с ними ушла единственная причина его знать.
+     *
+     * Довод оставлен намеренно и с пометкой. Убрать его — значит поправить
+     * вызывающих, а их два, и оба передают его осмысленно; когда наполнению
+     * снова понадобится предмет (подпись этапа, подбор картинки), он окажется
+     * на месте, а не вернётся третьим способом.
+     */
     subjectName: string;
     /**
      * Школа урока. ОБЯЗАТЕЛЬНА ДЛЯ СЛУЖЕБНОГО КЛЮЧА, и вот почему.
@@ -257,9 +229,5 @@ export async function applyGeneratedStages(
     input.onProgress?.(inserted, toAdd.length);
   }
 
-  const booksAttached = await attachBooksFromKnowledgeBase(
-    db, input.lessonId, input.teacherId, input.subjectName, input.schoolId,
-  ).catch(() => 0);
-
-  return { inserted, removed, booksAttached };
+  return { inserted, removed };
 }

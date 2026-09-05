@@ -3334,7 +3334,6 @@ export const uz: Dictionary = {
     workUsually: "odatda taxminan {n} s",
     workStepModel: "SI dars bosqichlarini tuzmoqda",
     workStepSaving: "Bosqichlar darsga saqlanmoqda",
-    workStepMaterials: "Kutubxonadan materiallar biriktirilmoqda",
     workStepHomework: "SI topshiriq tuzmoqda",
     workOf: "{n} dan {i}",
     chat: {
