@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   getDictionary,
@@ -21,16 +22,17 @@ import {
 import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage, SubjectWithGroup, CodeCompletionGap } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch, Link2, Blocks } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch, Link2, Blocks } from "lucide-react";
 import { CodeCompletionBuilder, codeCompletionValid } from "@/components/teacher/CodeCompletionBuilder";
 import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { parseVideoUrl } from "@/lib/video-url";
 import { uploadVideoFile } from "@/lib/video-storage";
 import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
+import { isHomeworkAiType } from "@/lib/ai/homework-ai-types";
 import { EduOSAssistantIcon } from "@/components/EduOSAssistantIcon";
 import { CodeEditor } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
-import { SERVICE_CONFIG, isExternalService, validateServiceUrl, EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
+import { SERVICE_CONFIG, isExternalService, validateServiceUrl } from "@/lib/external-services";
 import { servicesForSubject, type SubjectServices } from "@/lib/subject-services";
 import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS, isHtmlLanguage } from "@/lib/code-languages";
 
@@ -126,6 +128,8 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
   const [error, setError] = useState<string | null>(null);
   const [aiToast, setAiToast] = useState(false);
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
+  /** Составленное помощником, которое ждёт ответа «заменить или дополнить». */
+  const [aiОжидает, setAiОжидает] = useState<GeneratedHomework | null>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -216,33 +220,149 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
     setSubtasks((ts) => ts.map((t, idx) => idx === i ? { ...t, ...patch } : t));
   }
 
+  /**
+   * ЧТО У УЧИТЕЛЯ УЖЕ ЗАПОЛНЕНО. Список для вопроса «заменить или дополнить»:
+   * называем поля своими именами, а не «данные будут потеряны».
+   */
+  /**
+   * СНИМОК ПОЛЕЙ, КОТОРЫЙ НЕ УСТАРЕВАЕТ.
+   *
+   * Ответ помощника приходит через десять–тридцать секунд, и обработчик,
+   * пойманный замыканием в момент нажатия «Составить», видел бы форму такой,
+   * какой она была ТОГДА. Учитель за это время успевает и закрыть окно, и
+   * набрать название руками — и проверка «занято ли поле» отвечала бы «пусто»
+   * на непустую форму, то есть затирала бы написанное молча. Ровно то, что
+   * эта правка и убирает.
+   *
+   * Ref обновляется после каждой отрисовки, поэтому любой поздний вызов
+   * читает настоящее состояние, а не снимок годичной давности.
+   */
+  const поля = useRef({
+    title, description, format, questions, starterCode, expectedOutput, ccTemplate, ccGaps, subtasks,
+  });
+  useEffect(() => {
+    поля.current = {
+      title, description, format, questions, starterCode, expectedOutput, ccTemplate, ccGaps, subtasks,
+    };
+  });
+
+  /**
+   * ЧТО У УЧИТЕЛЯ УЖЕ ЗАПОЛНЕНО. Список для вопроса «заменить или дополнить»:
+   * называем поля своими именами, а не «данные будут потеряны».
+   */
+  function занятыеПоля(): string[] {
+    const п = поля.current;
+    const занято: string[] = [];
+    if (п.title.trim()) занято.push(d.teacher.formName.toLowerCase());
+    if (п.description.trim()) занято.push(d.teacher.formDesc.toLowerCase());
+    if (п.format === "test" && п.questions.length > 0) занято.push(d.teacher.hwAiFieldQuestions);
+    if (п.format === "programming" && (п.starterCode.trim() || п.expectedOutput.trim())) занято.push(d.teacher.hwAiFieldCode);
+    if (п.format === "code_completion" && (п.ccTemplate.trim() || п.ccGaps.length > 0)) занято.push(d.teacher.hwAiFieldTemplate);
+    if (п.format === "bundle" && п.subtasks.length > 0) занято.push(d.teacher.hwAiFieldSubtasks);
+    return занято;
+  }
+
+  /**
+   * ПОМОЩНИК БОЛЬШЕ НЕ ЗАТИРАЕТ НАПИСАННОЕ БЕЗ СПРОСА. 06.09.2026.
+   *
+   * Было: первым же делом setTitle/setDescription — молча, поверх всего, что
+   * учитель успел набрать, и отменить это было нечем. Помощник вызывается
+   * кнопкой в шапке, то есть чаще всего именно тогда, когда часть формы уже
+   * заполнена руками.
+   *
+   * Стало: поля заняты — спрашиваем. «Заменить» работает ровно как раньше,
+   * «Дополнить» НЕ ТЕРЯЕТ НИЧЕГО: название остаётся своё, описание дописывается
+   * снизу, вопросы добавляются к имеющимся, а заполненный код и шаблон с
+   * пропусками не трогаются вовсе — дописать код нельзя, и делать вид, что
+   * можно, было бы враньём. Пустые поля заполняются в обоих случаях.
+   */
   function handleAiGenerateApply(data: GeneratedHomework) {
-    setTitle(data.title);
-    setDescription(data.description);
-    if (format === "test" && data.config?.questions) {
-      setQuestions(
-        data.config.questions.map((q) => ({
-          type: "single_choice" as QuestionType,
-          text: q.question,
-          options: q.options.map((opt, i) => ({ text: opt, isCorrect: i === q.correctIndex })),
-        })),
-      );
+    if (занятыеПоля().length === 0) {
+      применитьОтПомощника(data, "заменить");
+      return;
     }
-    if (format === "programming" && data.config) {
-      if (data.config.starterCode) setStarterCode(data.config.starterCode);
-      if (data.config.expectedOutput) setExpectedOutput(data.config.expectedOutput);
-      if (data.config.language) setProgLanguage(data.config.language);
+    setAiОжидает(data);
+  }
+
+  function применитьОтПомощника(data: GeneratedHomework, режим: "заменить" | "дополнить") {
+    const заменяем = режим === "заменить";
+    // Настоящие значения на момент ПРИМЕНЕНИЯ, а не на момент нажатия.
+    const п = поля.current;
+
+    /*
+     * «ЗАМЕНИТЬ» — ЭТО ЗАМЕНИТЬ, А НЕ СТЕРЕТЬ.
+     *
+     * Описание помощник возвращает не всегда: у теста и у кода с пропусками
+     * проверка ответа его не требует (нужны вопросы либо шаблон), и пустая
+     * строка — законный ответ. Присвоение без оглядки затирало бы условие,
+     * написанное учителем, пустотой — а в сохранении для этих двух типов
+     * проверки описания нет вовсе: задание уходило бы к ученику без единого
+     * слова о том, что делать. Кнопка обещает содержимое помощника, а не
+     * удаление, поэтому пустое не кладём никогда.
+     */
+    if (data.title.trim() && (заменяем || !п.title.trim())) setTitle(data.title);
+    if (data.description.trim()) {
+      if (заменяем || !п.description.trim()) setDescription(data.description);
+      else setDescription((было) => `${было}
+
+${data.description}`);
+    }
+
+    if (п.format === "test" && data.config?.questions) {
+      const пришли = data.config.questions.map((q) => ({
+        type: "single_choice" as QuestionType,
+        text: q.question,
+        options: q.options.map((opt, i) => ({ text: opt, isCorrect: i === q.correctIndex })),
+      }));
+      setQuestions((было) => (заменяем ? пришли : [...было, ...пришли]));
+    }
+    if (п.format === "programming" && data.config) {
+      /*
+       * КОД, ЕГО ЯЗЫК И ЕГО ВЫВОД — ОДНА ТРОЙКА, А НЕ ТРИ ПОЛЯ.
+       *
+       * Развести их по отдельным проверкам нельзя: у учителя свой стартовый
+       * код на Java и пустое поле «Ожидаемый вывод», которое он собирался
+       * дописать. Отдельная проверка положила бы туда вывод питоновской
+       * программы помощника — той самой, что в форму не попала. Ученик
+       * увидел бы ожидаемый вывод, не имеющий отношения к условию, и
+       * подгонял бы решение под чужой ответ.
+       *
+       * Поэтому одно условие на всю тройку: код учителя занят — от помощника
+       * не берём НИЧЕГО из этой тройки.
+       */
+      const кодСвободен = заменяем || (!п.starterCode.trim() && !п.expectedOutput.trim());
+      if (кодСвободен) {
+        // ЦЕЛИКОМ, ВКЛЮЧАЯ ПУСТОЕ. Три отдельные проверки на непустоту рвали
+        // ту самую тройку, ради которой стоит одно условие: у задачи без
+        // печатаемого вывода помощник возвращает пустой expectedOutput, и
+        // рядом с его новым кодом оставался ожидаемый вывод от ПРЕЖНЕЙ задачи
+        // учителя. Ученик подгонял бы решение под чужой ответ.
+        setStarterCode(data.config.starterCode ?? "");
+        setExpectedOutput(data.config.expectedOutput ?? "");
+        if (data.config.language) setProgLanguage(data.config.language);
+      }
     }
     // Код с пропусками: шаблон и пропуски приходят в тех же именах, в каких
     // лежат в задании, — раскладывать по-другому не нужно.
-    if (format === "code_completion" && data.config) {
-      if (data.config.code_template) setCcTemplate(data.config.code_template);
-      if (Array.isArray(data.config.gaps)) setCcGaps(data.config.gaps);
-      if (data.config.language) setProgLanguage(data.config.language);
+    if (п.format === "code_completion" && data.config) {
+      const шаблонСвободен = заменяем || (!п.ccTemplate.trim() && п.ccGaps.length === 0);
+      if (шаблонСвободен) {
+        if (data.config.code_template) setCcTemplate(data.config.code_template);
+        if (Array.isArray(data.config.gaps)) setCcGaps(data.config.gaps);
+        // ЯЗЫК КЛАДЁМ В ccLang, А НЕ В progLanguage. Здесь стояло второе — и
+        // это было мимо: у «кода с пропусками» свой язык (ccLang), его же
+        // показывает редактор и его же сохраняет форма. Шаблон приезжал на
+        // JavaScript, а задание уходило в базу питоновским: ученик получал
+        // чужую подсветку. Заодно молча менялся язык «Программирования».
+        if (data.config.language) setCcLang(data.config.language);
+      }
     }
-    if (format === "bundle" && data.subtasks) {
-      setSubtasks(data.subtasks.map((s) => ({ type: s.type, title: s.title, description: s.description, config: s.config })));
+    if (п.format === "bundle" && data.subtasks) {
+      const пришли = data.subtasks.map((s) => ({ type: s.type, title: s.title, description: s.description, config: s.config }));
+      setSubtasks((было) => (заменяем ? пришли : [...было, ...пришли]));
     }
+
+    setAiОжидает(null);
     setAiToast(true);
     setTimeout(() => setAiToast(false), 4000);
   }
@@ -407,13 +527,47 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
   }
 
   const isExternal = isExternalService(format);
+  /**
+   * ТИП ДЛЯ ПОМОЩНИКА — НАСТОЯЩЕЙ ПРОВЕРКОЙ, А НЕ ПРИВЕДЕНИЕМ. 06.09.2026.
+   *
+   * Было: `format as "file" | "test" | "programming" | "bundle"` в месте
+   * вызова. Приведение — обещание компилятору, а не проверка: «код с
+   * пропусками» в союз не входил и проходил мимо него молча. Работало это
+   * случайно, и никто бы не узнал, если бы ручка его не поддерживала.
+   *
+   * Теперь союз один на всех (lib/ai/homework-ai-types.ts), а сужение делает
+   * isHomeworkAiType — она и правда смотрит на значение. Тип, которого
+   * помощник не умеет, честно даёт null, и кнопка гаснет.
+   */
+  const типДляПомощника = isHomeworkAiType(format) ? format : null;
+  /** Помощник не открывается, пока не сказано, для кого задание: без класса и
+   *  предмета уровень уходит в модель как «—», а подстройка под группу не
+   *  работает вовсе. */
   const subjectsForGroup = subjects.filter((s) => s.group_id === groupId);
-  const lessonsForSubject = lessonsForGroup.filter((l) => !subjectId || l.subjectId === subjectId);
+  /**
+   * ПРЕДМЕТ, КОТОРЫЙ ВОТ-ВОТ БУДЕТ ВЫБРАН, СЧИТАЕТСЯ ВЫБРАННЫМ.
+   *
+   * У класса ровно один предмет — его подставляет эффект ниже. Но эффект
+   * пассивный: между сменой класса и его срабатыванием проходит целый
+   * отрисованный кадр, в котором предмета «нет». Всё, что от предмета
+   * зависит, в этом кадре решает неправду — и решения успевают закрепиться.
+   *
+   * Так и вышло: учитель выбрал Wokwi для «Робототехники» 7А и переключил
+   * класс на 7Б с той же «Робототехникой». Сброс типа читал кадр без
+   * предмета и возвращал к «Файлу», хотя предмет тот же и Wokwi у него
+   * разрешён. Выбор отбирали на ровном месте.
+   *
+   * Поэтому предмет считается прямо в отрисовке, а не догоняется эффектом:
+   * гонки нет вовсе, и промежуточного кадра с пустой полкой тоже.
+   */
+  const эффективныйПредмет = subjectId || (subjectsForGroup.length === 1 ? subjectsForGroup[0]!.id : "");
+  const помощникГотов = !!groupId && !!эффективныйПредмет && типДляПомощника !== null;
+  const lessonsForSubject = lessonsForGroup.filter((l) => !эффективныйПредмет || l.subjectId === эффективныйПредмет);
   // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — external-service options filtered by the
   // selected subject; falls back to the linked lesson's subject for the rare
   // case a lesson is picked without an explicit subject (shouldn't happen
   // now that subject is required, kept for standalone/legacy safety).
-  const selectedSubjectName = subjects.find((s) => s.id === subjectId)?.name
+  const selectedSubjectName = subjects.find((s) => s.id === эффективныйПредмет)?.name
     ?? lessonsForGroup.find((l) => l.id === lessonId)?.subjectName
     ?? null;
   // Карта собирается здесь: через границу сервер → клиент Map не переживает.
@@ -426,7 +580,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
   // справочника, а если экран её не знает — по названию предмета.
   const allowedServiceOrder = servicesForSubject(
     subjectServices,
-    subjects.find((s) => s.id === subjectId)?.catalog_id ?? selectedSubjectName,
+    subjects.find((s) => s.id === эффективныйПредмет)?.catalog_id ?? selectedSubjectName,
   );
 
   /**
@@ -455,8 +609,27 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
    * всегда и ничего не теряет, кроме самого выбора типа.
    */
   useEffect(() => {
+    // Без предмета полка сервисов свёрнута, и подсветить выбранный нечем:
+    // ни одна кнопка типа не горит, а поле ссылки внизу висит. Раньше этого
+    // состояния не было — полка показывала все четырнадцать. Возвращаем к
+    // «Файлу» и здесь тоже: allowedServiceOrder без предмета отдаёт ВСЕ
+    // сервисы, поэтому проверка ниже сама по себе такой случай не ловит.
+    if (isExternalService(format) && !selectedSubjectName) { setFormat("file"); return; }
     if (isExternalService(format) && !allowedServiceOrder.includes(format)) setFormat("file");
-  }, [allowedServiceOrder, format]);
+  }, [allowedServiceOrder, format, selectedSubjectName]);
+
+  /**
+   * ОКНО ПОМОЩНИКА ЗАКРЫВАЕТСЯ, КОГДА ОТКРЫВАТЬ ЕГО СТАЛО НЕЛЬЗЯ.
+   *
+   * Смена класса сбрасывает предмет (эффект выше по файлу) — то есть окно,
+   * открытое на одном классе, теряет право на существование прямо во время
+   * работы. Без этой строки оно бы просто исчезло с экрана, а признак
+   * «открыто» остался бы взведённым: выбрал предмет — и окно выскакивает
+   * само, пустое. Гасим признак вместе с правом.
+   */
+  useEffect(() => {
+    if (!помощникГотов) setAiGenerateOpen(false);
+  }, [помощникГотов]);
 
   /**
    * ТИПЫ ЗАДАНИЯ, СГРУППИРОВАННЫЕ ПО ПРИЗНАКУ «ЧТО ВЕРНЁТСЯ НА ПРОВЕРКУ».
@@ -474,10 +647,13 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
    * ровно тот вопрос, ответа на который у человека нет:
    *
    *   тест и код с пропусками   считаются на сервере, оценка без учителя;
-   *   файл, программирование,
-   *   набор заданий             работа приходит обратно, оценивает человек;
-   *   четырнадцать сервисов     работа живёт на чужом сайте, обратно
+   *   файл и программирование   работа приходит обратно, оценивает человек;
+   *   сервисы предмета          работа живёт на чужом сайте, обратно
    *                             не приходит ничего.
+   *
+   * (Во второй полке был ещё «набор заданий» — снят с экрана 06.09.2026,
+   * см. комментарий над самой полкой ниже. Третья полка теперь показывает
+   * не все четырнадцать, а набор выбранного предмета.)
    *
    * НИЧЕГО НЕ ПРЯЧЕМ. Заказчик прямо просил не убирать типы за выпадающий
    * список — все они остаются на экране, только разложены по трём полкам.
@@ -486,7 +662,12 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
    * на три и снабжённый заголовками.
    */
   type ТипКнопки = { key: Format; label: string; Icon: typeof FileText };
-  const ГРУППЫ_ТИПОВ: Array<{ title: string; hint: string; count: string | null; items: ТипКнопки[] }> = [
+  const ГРУППЫ_ТИПОВ: Array<{
+    title: string; hint: string; count: string | null;
+    /** Текст вместо кнопок, когда полка сознательно пуста. */
+    empty?: string | null;
+    items: ТипКнопки[];
+  }> = [
     {
       title: d.teacher.hwGroupAuto,
       hint: d.teacher.hwGroupAutoHint,
@@ -500,10 +681,30 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
       title: d.teacher.hwGroupManual,
       hint: d.teacher.hwGroupManualHint,
       count: null,
+      /*
+       * «НАБОР ЗАДАНИЙ» УБРАН С ЭКРАНА. 06.09.2026. Решение заказчика.
+       *
+       * Замер: за всё время ноль заданий типа bundle и ноль подзадач в базе.
+       * При этом тип стоил дороже всех остальных: свой промт, свой редактор
+       * подзадач, семнадцать кнопок выбора типов в помощнике — и единственный
+       * из пяти, который уходит к модели БЕЗ строгой схемы (форма config
+       * зависит от соседнего поля "type", а responseSchema так не умеет).
+       * То есть самый ненадёжный тип на экране был и самым невостребованным.
+       *
+       * ИЗ ДАННЫХ НЕ УБРАН. content_type='bundle' остаётся в типах и в базе,
+       * витрина (карточка задания, экран ученика, экран учителя, решатель
+       * подзадач) не тронута: появись такое задание — оно откроется.
+       *
+       * КОД СОЗДАНИЯ ОСТАВЛЕН НАМЕРЕННО и разбросан по всему файлу: ветка в
+       * применитьОтПомощника и проверки при сохранении — ВЫШЕ этой строки,
+       * SUBTASK_TYPE_TABS и редактор подзадач — ниже. Всё это стало
+       * недостижимо, но цело: вернуть тип на экран значит вернуть строку сюда
+       * и иконку Layers в импорт lucide-react наверху файла (её убрали, чтобы
+       * не держать мёртвый импорт), а не переписывать форму.
+       */
       items: [
         { key: "file", label: d.homework.typeFile, Icon: FileText },
         { key: "programming", label: d.homework.typeProgramming, Icon: Code },
-        { key: "bundle", label: d.homework.typeBundle, Icon: Layers },
       ],
     },
     {
@@ -516,8 +717,23 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
         ? d.teacher.hwGroupExternalCount
             .replace("{n}", String(allowedServiceOrder.length))
             .replace("{subject}", selectedSubjectName)
-        : d.teacher.hwGroupExternalAll.replace("{n}", String(allowedServiceOrder.length)),
-      items: allowedServiceOrder.map((key) => ({ key, label: SERVICE_CONFIG[key].name, Icon: Globe })),
+        : null,
+      /*
+       * ПОЛКА МОЛЧИТ, ПОКА НЕ ВЫБРАН ПРЕДМЕТ. 06.09.2026.
+       *
+       * До выбора предмета здесь лежали ВСЕ четырнадцать сервисов — то есть
+       * четырнадцать кнопок, из которых для будущего предмета годятся четыре
+       * или восемь. Учитель нажимал «Wokwi», выбирал ниже «Математику», и
+       * кнопка исчезала: тип молча падал обратно на «Файл» (см. useEffect
+       * выше). Экран забирал выбор, которого сам же и предложил.
+       *
+       * Теперь пустая полка говорит словами, что нужно сделать. Ни один тип
+       * не удалён: выбрали предмет — сервисы на месте.
+       */
+      empty: selectedSubjectName ? null : d.teacher.hwServicesNeedSubject,
+      items: selectedSubjectName
+        ? allowedServiceOrder.map((key) => ({ key, label: SERVICE_CONFIG[key].name, Icon: Globe }))
+        : [],
     },
   ];
   const SUBTASK_TYPE_TABS: Array<{ key: HomeworkSubtaskType; label: string }> = [
@@ -537,16 +753,71 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
           {d.teacher.newHomeworkTitle}
         </h1>
         {!isExternal && (
-          <button
-            type="button"
-            onClick={() => setAiGenerateOpen(true)}
-            className="flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-orange-600 shadow-sm transition-all hover:bg-orange-50"
-          >
-            <EduOSAssistantIcon className="h-5 w-5" />
-            {d.ai.generateHomework.button}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={() => setAiGenerateOpen(true)}
+              disabled={!помощникГотов}
+              title={помощникГотов ? undefined : d.teacher.hwAiNeedsClassSubject}
+              className="flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-orange-600 shadow-sm transition-all hover:bg-orange-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
+            >
+              <EduOSAssistantIcon className="h-5 w-5" />
+              {d.ai.generateHomework.button}
+            </button>
+            {/* Причина словами, а не одной серой кнопкой: заказчик прямо
+                называл «понятно, только когда попробуешь» как поломку. */}
+            {!помощникГотов && (
+              <span className="text-[11.5px] text-amber-700">{d.teacher.hwAiNeedsClassSubject}</span>
+            )}
+          </div>
         )}
       </div>
+
+      {/*
+        * КЛАСС И ПРЕДМЕТ — НАД ТИПАМИ. 06.09.2026.
+        *
+        * Порядок на экране был обратен зависимости. Кнопки типов стояли
+        * первыми, а класс и предмет — ниже, в общей карточке полей. Между тем
+        * набор типов ЗАВИСИТ от предмета: полка внешних сервисов сужается по
+        * справочнику школы. Человек выбирал тип раньше, чем становилось
+        * известно, какие типы вообще есть, — и выбранный сервис у него потом
+        * отбирали.
+        *
+        * Теперь сначала «для кого», потом «что». Ни одно поле не потеряно:
+        * оба переехали сюда из сетки ниже, вместе со своими подписями и
+        * звёздочками; название и дедлайн остались там, где были.
+        */}
+      <section className="rounded-[20px] border border-white/80 bg-white/70 p-4 backdrop-blur-xl"
+        style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
+        <h2 className="text-[13px] font-bold text-brand-ink">{d.teacher.hwClassAndSubject}</h2>
+        <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-brand-ink-muted">
+              {d.teacher.formGroup} <span className="text-red-500">*</span>
+            </span>
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
+              className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none">
+              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-brand-ink-muted">
+              {d.teacher.formSubject} <span className="text-red-500">*</span>
+            </span>
+            {subjectsForGroup.length === 0 ? (
+              <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-700">
+                {d.lesson.createNoSubjects}
+              </p>
+            ) : (
+              <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}
+                className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none">
+                <option value="">{d.lesson.createSelectSubject}</option>
+                {subjectsForGroup.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
+          </label>
+        </div>
+      </section>
 
       {/* ВЫБОР ТИПА — три полки с заголовками. Разбор в ГРУППЫ_ТИПОВ выше. */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -563,6 +834,11 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
               )}
             </h2>
             <p className="mt-0.5 text-[11.5px] leading-snug text-slate-500">{г.hint}</p>
+            {г.empty && (
+              <p className="mt-3 rounded-[12px] border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5 text-[12px] leading-snug text-amber-800">
+                {г.empty}
+              </p>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               {г.items.map((t) => {
                 const active = format === t.key;
@@ -612,31 +888,6 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-brand-ink-muted">
-              {d.teacher.formGroup} <span className="text-red-500">*</span>
-            </span>
-            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
-              className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none">
-              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-brand-ink-muted">
-              {d.teacher.formSubject} <span className="text-red-500">*</span>
-            </span>
-            {subjectsForGroup.length === 0 ? (
-              <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-700">
-                {d.lesson.createNoSubjects}
-              </p>
-            ) : (
-              <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}
-                className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none">
-                <option value="">{d.lesson.createSelectSubject}</option>
-                {subjectsForGroup.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            )}
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-brand-ink-muted">
               {d.teacher.formDeadline} <span className="text-red-500">*</span>
             </span>
             <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)}
@@ -659,10 +910,10 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
           <select
             value={lessonId}
             onChange={(e) => setLessonId(e.target.value)}
-            disabled={!subjectId}
+            disabled={!эффективныйПредмет}
             className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {!subjectId ? (
+            {!эффективныйПредмет ? (
               <option value="">{d.lesson.selectSubjectFirst}</option>
             ) : (
               <>
@@ -687,7 +938,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
           {/* Зависимость сказана словами, а не одной бледной строкой внутри
               закрытого списка: заказчик прямо назвал её как пример того,
               что «видно только когда попробуешь». */}
-          {!subjectId && (
+          {!эффективныйПредмет && (
             <span className="text-[11.5px] text-amber-700">{d.teacher.hwLessonNeedsSubject}</span>
           )}
         </label>
@@ -1102,15 +1353,70 @@ export function CreateHomeworkForm({ groups, subjects, teacherId, subjectService
         </button>
       </div>
 
-      <HomeworkAiGenerateModal
-        isOpen={aiGenerateOpen}
-        onClose={() => setAiGenerateOpen(false)}
-        type={(isExternal ? "file" : format) as "file" | "test" | "programming" | "bundle"}
-        groupLabel={groups.find((g) => g.id === groupId)?.name ?? ""}
-        groupId={groupId}
-        subjectId={subjectId}
-        onApply={handleAiGenerateApply}
-      />
+      {/* Окно живёт, только когда тип помощнику знаком и сказано, для кого
+          задание: пустой уровень и отсутствие группы обесценивали генерацию. */}
+      {типДляПомощника && помощникГотов && (
+        <HomeworkAiGenerateModal
+          isOpen={aiGenerateOpen}
+          onClose={() => setAiGenerateOpen(false)}
+          type={типДляПомощника}
+          groupLabel={groups.find((g) => g.id === groupId)?.name ?? ""}
+          groupId={groupId}
+          subjectId={эффективныйПредмет}
+          allowedServices={allowedServiceOrder}
+          onApply={handleAiGenerateApply}
+        />
+      )}
+
+      {/*
+        * ЗАМЕНИТЬ ИЛИ ДОПОЛНИТЬ — вопрос вместо молчаливого затирания.
+        *
+        * ЧЕРЕЗ ПОРТАЛ, как и соседнее окно помощника. Прямым ребёнком формы
+        * затемнение получало от `space-y-5` отступ сверху в 20 пикселей: у
+        * `fixed inset-0` он входит в уравнение высоты, и вдоль верхнего края
+        * оставалась незатемнённая полоса, сквозь которую клики проходили в
+        * шапку под окном — попытка закрыть окно кликом по фону могла увести
+        * со страницы и потерять всю заполненную форму.
+        */}
+      {aiОжидает && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setAiОжидает(null); }}
+        >
+          <div className="w-full max-w-md rounded-[20px] bg-white p-6 shadow-2xl">
+            <h3 className="text-[16px] font-bold text-brand-ink">{d.teacher.hwAiFilledTitle}</h3>
+            <p className="mt-2 text-[13.5px] leading-snug text-brand-ink-muted">
+              {d.teacher.hwAiFilledBody.replace("{fields}", занятыеПоля().join(", "))}
+            </p>
+            <p className="mt-2 text-[12px] leading-snug text-slate-500">{d.teacher.hwAiFilledHint}</p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAiОжидает(null)}
+                className="rounded-[12px] px-4 py-2.5 text-[14px] font-semibold text-brand-ink-muted hover:bg-slate-100"
+              >
+                {d.common.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => применитьОтПомощника(aiОжидает, "дополнить")}
+                className="rounded-[12px] border border-slate-200 px-4 py-2.5 text-[14px] font-semibold text-brand-ink hover:bg-slate-50"
+              >
+                {d.teacher.hwAiAppend}
+              </button>
+              <button
+                type="button"
+                onClick={() => применитьОтПомощника(aiОжидает, "заменить")}
+                className="rounded-[12px] bg-brand-blue px-4 py-2.5 text-[14px] font-semibold text-white hover:brightness-110"
+              >
+                {d.teacher.hwAiReplace}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {aiToast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-[14px] bg-slate-800 px-4 py-3 text-[13px] font-medium text-white shadow-xl">

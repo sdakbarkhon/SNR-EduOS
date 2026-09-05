@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
 import { getDictionary, type Locale, type CodeLanguage, type ExternalServiceType } from "@snr/core";
@@ -9,7 +9,8 @@ import { AiWorkProgress, useTypicalDuration } from "@/components/AiWorkProgress"
 import { AI_TASKS } from "@/lib/ai/usage";
 import { EduOSAssistantIcon } from "@/components/EduOSAssistantIcon";
 import { cn } from "@/lib/cn";
-import { SERVICE_CONFIG, EXTERNAL_SERVICE_ORDER, isExternalService } from "@/lib/external-services";
+import { SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
+import type { HomeworkAiType } from "@/lib/ai/homework-ai-types";
 
 export interface GeneratedHomework {
   title: string;
@@ -32,18 +33,32 @@ export interface GeneratedHomework {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  type: "file" | "test" | "programming" | "bundle";
+  /** Один список на форму, окно и ручку — lib/ai/homework-ai-types.ts.
+   *  Приведения в месте вызова больше нет: форма сужает тип проверкой. */
+  type: HomeworkAiType;
   groupLabel: string; // e.g. "Математика — 7А", shown read-only as the auto-filled "level" context
   /** Группа и предмет — чтобы сервер подстроил сложность под то, как эта
    *  группа реально учится. Необязательны: если их нет, задание генерируется
    *  ровно как раньше. */
   groupId?: string;
   subjectId?: string;
+  /**
+   * СЕРВИСЫ, КОТОРЫЕ ШКОЛА ВКЛЮЧИЛА ДЛЯ ЭТОГО ПРЕДМЕТА. 06.09.2026.
+   *
+   * Было: окно предлагало ВСЕ четырнадцать, а форма — только разрешённые
+   * предмету (справочник школы, миграция 258). Помощник мог вернуть подзадачу
+   * на сервисе, которого у школы нет, и она ложилась в форму: кнопки такого
+   * типа на экране нет, а подзадача есть.
+   *
+   * Список приходит от формы, но полагаться на него нельзя — ручка проверяет
+   * набор сама, по справочнику. Здесь он только для того, чтобы учитель не
+   * увидел лишних кнопок.
+   */
+  allowedServices: readonly ExternalServiceType[];
   onApply: (data: GeneratedHomework) => void;
 }
 
-const BUNDLE_SUBTASK_TYPES = ["file", "test", "code", ...EXTERNAL_SERVICE_ORDER] as const;
-type BundleSubtaskType = (typeof BUNDLE_SUBTASK_TYPES)[number];
+type BundleSubtaskType = "file" | "test" | "code" | ExternalServiceType;
 
 function bundleTypeLabel(bt: BundleSubtaskType, d: ReturnType<typeof getDictionary>): string {
   if (isExternalService(bt)) return SERVICE_CONFIG[bt].name;
@@ -55,7 +70,7 @@ function bundleTypeLabel(bt: BundleSubtaskType, d: ReturnType<typeof getDictiona
   }
 }
 
-export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, groupId, subjectId, onApply }: Props) {
+export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, groupId, subjectId, allowedServices, onApply }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.ai.generateHomework;
@@ -63,6 +78,7 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
   const [topic, setTopic] = useState("");
   const [hints, setHints] = useState("");
   const [bundleTypes, setBundleTypes] = useState<Set<BundleSubtaskType>>(new Set());
+  const bundleSubtaskTypes: BundleSubtaskType[] = ["file", "test", "code", ...allowedServices];
   const [generating, setGenerating] = useState(false);
   // Здесь шаг ровно один: составление задания — это единственный запрос, и
   // разбить его на видимые части нечем. Поэтому показываем честно один шаг,
@@ -70,10 +86,26 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
   const typicalMs = useTypicalDuration(AI_TASKS.generateHomework);
   const [error, setError] = useState("");
 
+  /**
+   * «ОТМЕНА» ТЕПЕРЬ ПРАВДА ОТМЕНЯЕТ. 06.09.2026.
+   *
+   * Было: крестик, «Отмена» и клик по фону закрывали окно, но запрос жил
+   * дальше — отменять его было нечем. Через десять–тридцать секунд ответ
+   * всё равно доходил до onApply, и задание, которое учитель отменил,
+   * само ложилось в форму. Хуже того: если он к тому времени начал
+   * заполнять её руками, посреди работы выскакивал диалог «Заменить или
+   * дополнить» без всякого повода на экране.
+   *
+   * Держим сам запрос и рвём его при закрытии и при размонтировании.
+   */
+  const запрос = useRef<AbortController | null>(null);
+
   // Reset transient state whenever the modal is (re)opened/closed so a
   // previous topic/error doesn't linger into the next open.
   useEffect(() => {
     if (!isOpen) {
+      запрос.current?.abort();
+      запрос.current = null;
       setTopic("");
       setHints("");
       setBundleTypes(new Set());
@@ -81,6 +113,11 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
       setError("");
     }
   }, [isOpen]);
+
+  // Окно может исчезнуть и без кнопки: сменили класс — предмет сбросился,
+  // и родитель снял помощника с экрана. Запрос обязан уйти вместе с ним,
+  // иначе задание для покинутого класса доедет до формы.
+  useEffect(() => () => { запрос.current?.abort(); }, []);
 
   function toggleBundleType(bt: BundleSubtaskType) {
     setBundleTypes((prev) => {
@@ -95,9 +132,12 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
     if (!topic.trim() || generating) return;
     setGenerating(true);
     setError("");
+    const свой = new AbortController();
+    запрос.current = свой;
     try {
       const res = await fetch("/api/ai/generate-homework", {
         method: "POST",
+        signal: свой.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
@@ -128,11 +168,16 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
         setError(человеческий ? серверный : t.error);
         return;
       }
+      // Окно закрыли, пока ответ был в пути — результат выбрасываем.
+      if (свой.signal.aborted) return;
       onApply(data);
       onClose();
-    } catch {
+    } catch (e) {
+      // Учитель сам закрыл окно — молча уходим: ни ошибки, ни применения.
+      if ((e as Error)?.name === "AbortError") return;
       setError(t.error);
     } finally {
+      if (запрос.current === свой) запрос.current = null;
       setGenerating(false);
     }
   }
@@ -194,7 +239,7 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
               <span className="text-[13px] font-medium text-brand-ink-muted">{t.bundleTypesLabel}</span>
               <p className="text-[11px] text-slate-400">{t.bundleTypesHint}</p>
               <div className="flex flex-wrap gap-2">
-                {BUNDLE_SUBTASK_TYPES.map((bt) => {
+                {bundleSubtaskTypes.map((bt) => {
                   const active = bundleTypes.has(bt);
                   return (
                     <button

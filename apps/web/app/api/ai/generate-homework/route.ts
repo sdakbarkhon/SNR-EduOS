@@ -13,6 +13,8 @@ import {
   HOMEWORK_FILE_SCHEMA, HOMEWORK_TEST_SCHEMA, HOMEWORK_PROGRAMMING_SCHEMA, HOMEWORK_CODE_COMPLETION_SCHEMA,
 } from "@/lib/ai/schemas";
 import { EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
+import { loadSubjectServices, servicesForSubject } from "@/lib/subject-services";
+import { HOMEWORK_AI_TYPES, type HomeworkAiType } from "@/lib/ai/homework-ai-types";
 import type { CodeLanguage, ExternalServiceType } from "@snr/core";
 
 export const runtime = "nodejs";
@@ -20,16 +22,53 @@ export const maxDuration = 30;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type HomeworkType = "file" | "test" | "programming" | "bundle" | "code_completion";
+type HomeworkType = HomeworkAiType;
 type SubtaskType = "file" | "test" | "code" | ExternalServiceType;
 
 // 04.09.2026 — «код с пропусками» добавлен пятым. Тип был в форме с самого
 // начала, а здесь его не завели: форма отправляла его как есть, роут отвечал
 // «Invalid type», и учитель видел «Попробуйте ещё раз» — совет, который не мог
 // помочь никогда.
-const ALLOWED_TYPES: HomeworkType[] = ["file", "test", "programming", "bundle", "code_completion"];
-const ALLOWED_SUBTASK_TYPES: SubtaskType[] = ["file", "test", "code", ...EXTERNAL_SERVICE_ORDER];
+//
+// 06.09.2026 — список переехал в lib/ai/homework-ai-types.ts и стал ОДИН на
+// форму, окно и эту ручку. Здесь копии больше нет: разойтись им теперь нечем.
+const ALLOWED_TYPES: readonly HomeworkType[] = HOMEWORK_AI_TYPES;
 const RUNNABLE_LANGUAGES: CodeLanguage[] = ["python", "javascript", "cpp", "java"];
+
+/**
+ * СЕРВИСЫ ПОДЗАДАЧ — ТОЛЬКО ТЕ, ЧТО ШКОЛА ВКЛЮЧИЛА ДЛЯ ПРЕДМЕТА. 06.09.2026.
+ *
+ * Раньше список подзадач был один на всех — все четырнадцать сервисов, — и
+ * ручка принимала любой из них. Форма при этом показывает только набор
+ * предмета (справочник школы, миграция 258), так что подзадача могла прийти
+ * на сервисе, кнопки которого на экране нет.
+ *
+ * СПИСОК КЛИЕНТА НЕ ПРИНИМАЕТСЯ. Он приходит только в `bundleSubtaskTypes` —
+ * как пожелание, — и всё равно просеивается через этот набор. Сам набор
+ * читается здесь, из справочника, под сессией учителя.
+ *
+ * ПРАВИЛО РОВНО ТО ЖЕ, ЧТО НА ЭКРАНЕ: та же функция servicesForSubject, и
+ * тот же запасной ход — набора нет (предмет не передан, колонка пуста) —
+ * отдаём все. Иначе экран предлагал бы сервис, который ручка отвергает.
+ */
+async function разрешённыеСервисы(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  subjectId: string | undefined,
+): Promise<readonly ExternalServiceType[]> {
+  if (!subjectId) return EXTERNAL_SERVICE_ORDER;
+  try {
+    const { data: subj } = await db
+      .from("subjects").select("name, catalog_id").eq("id", subjectId).maybeSingle();
+    if (!subj) return EXTERNAL_SERVICE_ORDER;
+    const карта = await loadSubjectServices(db);
+    const строка = subj as { name: string | null; catalog_id: string | null };
+    return servicesForSubject(карта, строка.catalog_id ?? строка.name);
+  } catch (e) {
+    console.error("[ai-homework] набор сервисов предмета не прочитался:", (e as Error)?.message);
+    return EXTERNAL_SERVICE_ORDER;
+  }
+}
 
 interface RequestBody {
   type: HomeworkType;
@@ -204,9 +243,14 @@ const CODE_COMPLETION_MIN_GAPS = 3;
 
 const MAX_BUNDLE_SUBTASKS = 4;
 
-function normalizeSubtask(s: GenSubtask): { type: SubtaskType; title: string; description: string; config: Record<string, unknown> } | null {
+function normalizeSubtask(
+  s: GenSubtask,
+  допустимые: readonly SubtaskType[],
+): { type: SubtaskType; title: string; description: string; config: Record<string, unknown> } | null {
   if (!s || typeof s.title !== "string" || !s.title.trim()) return null;
-  const type = ALLOWED_SUBTASK_TYPES.includes(s.type as SubtaskType) ? (s.type as SubtaskType) : null;
+  // Набор пришёл из справочника школы, а не из запроса: подзадача на сервисе,
+  // которого школа для предмета не включала, отбрасывается здесь.
+  const type = допустимые.includes(s.type as SubtaskType) ? (s.type as SubtaskType) : null;
   if (!type) return null;
   const title = s.title.trim();
   const description = typeof s.description === "string" ? s.description.trim() : "";
@@ -229,12 +273,12 @@ function normalizeSubtask(s: GenSubtask): { type: SubtaskType; title: string; de
   return { type, title, description, config };
 }
 
-function normalizeBundleResult(parsed: GenRaw): GeneratedHomework | null {
+function normalizeBundleResult(parsed: GenRaw, допустимые: readonly SubtaskType[]): GeneratedHomework | null {
   const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
   const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
   const rawSubtasks = Array.isArray(parsed.subtasks) ? parsed.subtasks : [];
   const subtasks = rawSubtasks
-    .map(normalizeSubtask)
+    .map((s) => normalizeSubtask(s, допустимые))
     .filter((s): s is NonNullable<ReturnType<typeof normalizeSubtask>> => s !== null)
     .slice(0, MAX_BUNDLE_SUBTASKS);
   if (!title || subtasks.length === 0) return null;
@@ -272,9 +316,30 @@ export async function POST(req: NextRequest) {
   const level = body.level?.trim() || "—";
   const hints = body.hints?.trim() || undefined;
   const type = body.type;
-  const requestedSubtaskTypes = Array.isArray(body.bundleSubtaskTypes)
-    ? body.bundleSubtaskTypes.filter((t): t is SubtaskType => ALLOWED_SUBTASK_TYPES.includes(t as SubtaskType))
-    : [];
+
+  // Набор сервисов предмета — из справочника, до сборки промта: он решает и
+  // что просить у модели, и что принять обратно.
+  const сервисы = await разрешённыеСервисы(db, body.subjectId);
+  const допустимыеПодзадачи: SubtaskType[] = ["file", "test", "code", ...сервисы];
+  const запрошеныПодзадачи = Array.isArray(body.bundleSubtaskTypes) ? body.bundleSubtaskTypes : [];
+  const requestedSubtaskTypes = запрошеныПодзадачи
+    .filter((t): t is SubtaskType => допустимыеПодзадачи.includes(t as SubtaskType));
+
+  // ПРОСЬБУ УЧИТЕЛЯ НЕ ПОДМЕНЯЕМ МОЛЧА — И ЧАСТИЧНО ТОЖЕ.
+  //
+  // Не уцелел ни один тип — промт ушёл бы в ветку «сам выбери 2–4», то есть
+  // учитель попросил одно, а получил другое. Но и потеря ОДНОГО из трёх
+  // молчит не меньше: промт попросит «ровно два», и про исчезнувший третий
+  // никто не скажет. Случай достижим обычным путём — админ снял галочку, а
+  // открытая форма ещё показывает прежние кнопки. Поэтому отказываем на любой
+  // потере и называем, что именно не включено.
+  const потеряны = запрошеныПодзадачи.filter((t) => !requestedSubtaskTypes.includes(t as SubtaskType));
+  if (потеряны.length > 0) {
+    return NextResponse.json(
+      { error: `Школа не включила для этого предмета: ${потеряны.join(", ")}. Выберите другие типы подзадач.` },
+      { status: 400 },
+    );
+  }
 
   // Уровень группы — в ТОТ ЖЕ промпт, отдельного обращения к модели нет.
   // Данных мало или группа не передана — строка пустая, и промпт получается
@@ -312,7 +377,7 @@ export async function POST(req: NextRequest) {
     : type === "test" ? buildHomeworkTestPrompt(topic, level, hints, groupContext)
     : type === "programming" ? buildHomeworkProgrammingPrompt(topic, level, hints, groupContext)
     : type === "code_completion" ? buildHomeworkCodeCompletionPrompt(topic, level, hints, groupContext)
-    : buildHomeworkBundlePrompt(topic, level, hints, requestedSubtaskTypes, EXTERNAL_SERVICE_ORDER, groupContext);
+    : buildHomeworkBundlePrompt(topic, level, hints, requestedSubtaskTypes, сервисы, groupContext);
 
   // bundle остаётся без строгой схемы — см. комментарий в lib/ai/schemas.ts
   // (config-форма зависит от значения соседнего поля "type", Gemini responseSchema
@@ -351,7 +416,7 @@ export async function POST(req: NextRequest) {
       : type === "test" ? normalizeTestResult(parsed)
       : type === "programming" ? normalizeProgrammingResult(parsed)
       : type === "code_completion" ? normalizeCodeCompletionResult(parsed)
-      : normalizeBundleResult(parsed);
+      : normalizeBundleResult(parsed, допустимыеПодзадачи);
 
     if (!normalized) {
       lastError = "Generated homework failed validation";
