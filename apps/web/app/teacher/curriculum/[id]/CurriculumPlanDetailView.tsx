@@ -35,7 +35,7 @@ function topicWord(n: number, d: Dictionary["curriculum"]): string {
 /** Ответ /api/lessons/bulk. Тот же роут, что у массового создания уроков —
  *  шаг 1 не заводит своей раскладки, он зовёт готовую. */
 type BulkPreview = {
-  lessons: Array<{ date: string; time: string; occupied: boolean; topicTitle: string | null }>;
+  lessons: Array<{ date: string; time: string; occupied: boolean; occupiedByMe?: boolean; topicTitle: string | null }>;
   willCreate: number;
   occupied: number;
   /** Темы, по которым урок уже есть: в раздачу они не идут и не шли, но
@@ -959,7 +959,7 @@ export function CurriculumPlanDetailView({
                                 <td className="whitespace-nowrap px-2.5 py-1.5 font-semibold">{l.date}</td>
                                 <td className="whitespace-nowrap px-2.5 py-1.5">{l.time}</td>
                                 <td className="px-2.5 py-1.5">
-                                  {l.occupied ? <span className="italic">{tt.bulkOccupiedRow}</span> : l.topicTitle}
+                                  {l.occupied ? <span className="italic">{l.occupiedByMe ? tt.bulkBusyMeRow : tt.bulkOccupiedRow}</span> : l.topicTitle}
                                 </td>
                               </tr>
                             ))}

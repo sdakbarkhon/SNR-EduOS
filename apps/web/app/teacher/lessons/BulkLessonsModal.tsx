@@ -62,6 +62,9 @@ type PlannedLesson = {
   date: string;
   time: string;
   occupied: boolean;
+  /** Занято не уроком группы, а самим учителем — у него в это время урок в
+   *  другой группе или школе. Подпись в строке от этого меняется. */
+  occupiedByMe?: boolean;
   topicId: string | null;
   topicTitle: string | null;
 };
@@ -466,7 +469,7 @@ export function BulkLessonsFields({
                             <td className="whitespace-nowrap px-2.5 py-1.5">{l.time}</td>
                             <td className="px-2.5 py-1.5">
                               {l.occupied
-                                ? <span className="italic">{t.bulkOccupiedRow}</span>
+                                ? <span className="italic">{l.occupiedByMe ? t.bulkBusyMeRow : t.bulkOccupiedRow}</span>
                                 : l.topicTitle ?? <span className="italic text-gray-400">{t.bulkNoTopicRow}</span>}
                             </td>
                           </tr>

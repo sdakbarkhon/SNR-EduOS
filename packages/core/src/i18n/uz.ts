@@ -2920,6 +2920,7 @@ export const uz: Dictionary = {
     bulkDone: "Yaratilgan darslar: {n}",
     bulkBack: "O‘zgartirish",
     bulkOccupiedRow: "allaqachon bor",
+    bulkBusyMeRow: "bu vaqtda sizda boshqa dars bor",
     bulkNoTopicRow: "mavzusiz",
     bulkPickWeekday: "Kamida bitta hafta kunini tanlang",
     bulkBadPeriod: "Davr oxiri boshidan oldin",

@@ -2920,6 +2920,7 @@ export const en: Dictionary = {
     bulkDone: "Lessons created: {n}",
     bulkBack: "Change",
     bulkOccupiedRow: "already exists",
+    bulkBusyMeRow: "you have another lesson at this time",
     bulkNoTopicRow: "no topic",
     bulkPickWeekday: "Pick at least one day of the week",
     bulkBadPeriod: "The end of the period is before its start",

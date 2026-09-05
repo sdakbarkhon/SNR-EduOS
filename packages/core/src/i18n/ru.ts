@@ -2928,6 +2928,7 @@ export const ru: Dictionary = {
     bulkDone: "Создано уроков: {n}",
     bulkBack: "Изменить",
     bulkOccupiedRow: "уже есть",
+    bulkBusyMeRow: "в это время у вас другой урок",
     bulkNoTopicRow: "без темы",
     bulkPickWeekday: "Выберите хотя бы один день недели",
     bulkBadPeriod: "Конец периода раньше начала",

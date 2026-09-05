@@ -3030,6 +3030,8 @@ export interface Dictionary {
     bulkDone: string;
     bulkBack: string;
     bulkOccupiedRow: string;
+    /** Слот занят не уроком группы, а самим учителем — у него в это время урок в другой группе или школе. Названия чужой школы здесь быть не должно. */
+    bulkBusyMeRow: string;
     bulkNoTopicRow: string;
     bulkPickWeekday: string;
     bulkBadPeriod: string;

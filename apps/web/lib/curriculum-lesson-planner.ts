@@ -13,7 +13,7 @@
 // перестал быть константой — его выбирает учитель и передаёт доводом
 // startDate (02.09.2026, пункт 13).
 
-import { getGroupLessonsInDateRange, tashkentDayKey } from "@snr/core";
+import { getGroupLessonsInDateRange, getMyTeacherBusyBetween, tashkentDayKey } from "@snr/core";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = any;
 
@@ -102,7 +102,47 @@ function minutesToHHMM(mins: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-type Busy = { starts_at: string; ends_at: string | null };
+/**
+ * ЗАНЯТОЕ ВРЕМЯ. `свой` — это НЕ урок этой группы, а урок самого учителя
+ * где-то ещё: в другой группе или вовсе в другой школе.
+ *
+ * Различать их приходится ради подписи в предпросмотре: «здесь уже стоит урок
+ * группы» и «в это время заняты вы» — разные новости, и вторая для человека
+ * важнее, потому что группу он видит на экране, а себя в другой школе — нет.
+ */
+type Busy = { starts_at: string; ends_at: string | null; свой?: boolean };
+
+/**
+ * Уроки самого учителя за окно — по ВСЕМ его школам. 06.09.2026.
+ *
+ * ЗАЧЕМ. Занятость считалась по группе: спрашивались уроки одной группы, и
+ * новый урок не давали поставить поверх них. Про самого человека не спрашивал
+ * никто — ни код, ни база (ни ограничения, ни триггера на `lessons` нет). Пока
+ * школа была одна, это давало наложения в пределах школы; с двумя школами
+ * учитель мог оказаться на двух уроках разом в разных зданиях, и увидеть это
+ * было неоткуда: свои уроки в невыбранной школе он не видит сам.
+ *
+ * ПОЧЕМУ ЗДЕСЬ, А НЕ У ВЫЗЫВАЮЩИХ. Раскладок две, вызывающих больше, а окно
+ * времени знает только сама раскладка. Спроси мы у вызывающих — каждый считал
+ * бы окно по-своему.
+ *
+ * Своя ошибка раскладку не рушит: не смогли спросить — считаем, что человек
+ * свободен, и полагаемся на запрет в createLesson. Пустой предпросмотр из-за
+ * сбоя был бы хуже.
+ */
+async function мояЗанятость(db: AnyDb, from: string, to: string): Promise<Busy[]> {
+  try {
+    const строки = await getMyTeacherBusyBetween(
+      db,
+      `${from}T00:00:00+05:00`,
+      `${to}T23:59:59+05:00`,
+    );
+    return строки.map((l) => ({ starts_at: l.starts_at, ends_at: l.ends_at, свой: true }));
+  } catch (e) {
+    console.error("[planner] занятость учителя не прочиталась:", (e as Error)?.message);
+    return [];
+  }
+}
 
 /** Первый свободный слот сетки на эту дату для этой группы, либо null если
  *  день занят целиком. */
@@ -150,10 +190,13 @@ export async function planLessonSlots(
   if (topics.length === 0) return [];
 
   const rangeTo = addDaysUTC(startDate, topics.length + 30);
-  const existing = await getGroupLessonsInDateRange(db, groupId, startDate, rangeTo);
+  const [existing, свои] = await Promise.all([
+    getGroupLessonsInDateRange(db, groupId, startDate, rangeTo),
+    мояЗанятость(db, startDate, rangeTo),
+  ]);
 
   const byDate = new Map<string, Busy[]>();
-  for (const l of existing) {
+  for (const l of [...existing, ...свои]) {
     const key = tashkentDateOf(l.starts_at);
     if (!byDate.has(key)) byDate.set(key, []);
     byDate.get(key)!.push(l);
@@ -221,6 +264,16 @@ export type PlannedLesson = {
    *  попадает в предпросмотр: учитель должен видеть, что пропущено и почему,
    *  а не гадать, почему уроков вышло меньше, чем дней. */
   occupied: boolean;
+  /**
+   * Занято НЕ уроком группы, а самим учителем — у него в это время урок в
+   * другой группе или в другой школе.
+   *
+   * Отдельным полем, потому что подпись другая: урок группы человек видит на
+   * том же экране, а себя в невыбранной школе — нет, и «занято» без пояснения
+   * выглядело бы ошибкой системы. Названия чужой школы здесь нет и не будет:
+   * человеку довольно знать, что время занято им самим.
+   */
+  occupiedByMe?: boolean;
   /** Тема из плана. null — тем не хватило либо учитель их не просил. */
   topicId: string | null;
   topicTitle: string | null;
@@ -291,10 +344,13 @@ export async function planWeeklySchedule(
   if (input.to < input.from) return [];
 
   const dur = input.durationMinutes;
-  const existing = await getGroupLessonsInDateRange(db, groupId, input.from, input.to);
+  const [existing, свои] = await Promise.all([
+    getGroupLessonsInDateRange(db, groupId, input.from, input.to),
+    мояЗанятость(db, input.from, input.to),
+  ]);
 
   const byDate = new Map<string, Busy[]>();
-  for (const l of existing) {
+  for (const l of [...existing, ...свои]) {
     const key = tashkentDateOf(l.starts_at);
     if (!byDate.has(key)) byDate.set(key, []);
     byDate.get(key)!.push(l);
@@ -322,13 +378,18 @@ export async function planWeeklySchedule(
       // таблице — тем более. Не показываем и не считаем.
       if (startMs > nowMs) {
         const dayLessons = byDate.get(cursor) ?? [];
-        const occupied = dayLessons.some((l) => {
+        const наезды = dayLessons.filter((l) => {
           const ls = new Date(l.starts_at).getTime();
           const le = l.ends_at ? new Date(l.ends_at).getTime() : ls + dur * 60 * 1000;
           return startMs < le && endMs > ls;
         });
+        const occupied = наезды.length > 0;
         out.push({
           date: cursor, time, occupied,
+          // Занято ТОЛЬКО собственным уроком где-то ещё — значит группа здесь
+          // свободна, а занят сам человек. Если наехали оба, показываем урок
+          // группы: он ближе и понятнее, его видно на том же экране.
+          occupiedByMe: occupied && наезды.every((l) => l.свой === true),
           topicId: null, topicTitle: null, topicDescription: null,
         });
       }
