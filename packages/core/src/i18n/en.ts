@@ -2485,8 +2485,7 @@ export const en: Dictionary = {
       fullscreen: "Fullscreen",
       exitFullscreen: "Exit fullscreen (Esc)",
       fullscreenTitle: "Presentation",
-      lockedHint: "The presentation is running. Hold Esc to leave",
-      holdingExit: "Keep holding Esc…",
+      lockedHint: "The presentation is running — you can leave once the teacher finishes the stage",
     },
     contentSource: {
       label: "Content source",

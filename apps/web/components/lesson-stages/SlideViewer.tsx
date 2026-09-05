@@ -16,13 +16,11 @@ import { SlideBody } from "./SlideBody";
  *  доступную высоту (frameMaxHeight ниже), саму панель не затрагивает. */
 const NAV_BAR_PX = 72;
 
-/** Сколько держать Esc, чтобы выйти из презентации, пока идёт этап. */
-const EXIT_HOLD_MS = 2000;
-/** Через сколько после входа проявляется кнопка закрытия. До этого выход
- *  только удержанием — чтобы в первые секунды объяснения крестик не тянул
- *  на себя внимание класса. */
-const EXIT_BUTTON_DELAY_MS = 20000;
-/** Сколько висит подсказка после короткого нажатия Esc. */
+/* 06.09.2026 — EXIT_HOLD_MS и EXIT_BUTTON_DELAY_MS убраны вместе с выходом
+   удержанием: у запертого ученика выхода нет вовсе, а не «через две секунды
+   удержания» и не «через двадцать секунд ожидания крестика». */
+
+/** Сколько висит подсказка после нажатия Esc. */
 const HINT_MS = 3500;
 
 export function SlideViewer({
@@ -108,7 +106,14 @@ export function SlideViewer({
   // lesson is actually ongoing (RLS scopes the write to the student's own
   // group + the lesson's currently-active stage); "completed" review mode
   // is unchanged (navigate locally, never write).
-  const canNavigate = !viewerOnly && (isTeacher || lessonStatus === "completed" || lessonStatus === "in_progress");
+  // 06.09.2026 — СЛАЙДЫ ПЕРЕКЛЮЧАЕТ ТОЛЬКО УЧИТЕЛЬ. Решение заказчика,
+  // отменяющее миграцию 150 («ведут вдвоём: щелчок любого двигает всем»).
+  // Ученик слайд ВИДИТ и следует за учителем по подписке, но кнопок «назад»
+  // и «далее» у него нет вовсе, как нет и стрелок с клавиатуры.
+  //
+  // Разбор ПОСЛЕ урока не тронут: там ученик листает свой же материал сам,
+  // локально и никому ничего не транслируя.
+  const canNavigate = !viewerOnly && (isTeacher || lessonStatus === "completed");
   // Writes to the shared current_slide_index — ТОЛЬКО пока урок реально идёт,
   // одинаково для учителя и ученика.
   //
@@ -119,7 +124,10 @@ export function SlideViewer({
   // завершения) учитель листает локально — материал его, но трансляции быть
   // не должно. Живой урок не затронут: там lessonStatus === "in_progress" и
   // синхронизация работает как раньше.
-  const syncsWrite = !viewerOnly && lessonStatus === "in_progress";
+  // Пишет общий слайд ТОЛЬКО учитель и только пока урок идёт. До старта и
+  // после завершения он листает локально: материал его, но трансляции быть
+  // не должно (07.08.2026).
+  const syncsWrite = !viewerOnly && isTeacher && lessonStatus === "in_progress";
   // Solo (unsynced) review is the ONLY case where nobody else can move this
   // slide — everyone else (teacher during any status, or a student during a
   // live lesson) must stay subscribed so they see every participant's clicks,
@@ -167,12 +175,18 @@ export function SlideViewer({
   // Учителя не запираем никогда — см. комментарий к пропу. Флаг приходит
   // обычным пропом, поэтому снятие блокировки (этап кончился, урок завершён,
   // потеряна связь с сервером) сразу возвращает обычные Esc и кнопку.
-  const holdToExit = isFull && lockedUntilStageEnds && !isTeacher;
+  // 06.09.2026 — ВЫХОДА У УЧЕНИКА НЕТ, пока идёт этап. Решение заказчика,
+  // отменяющее прежний «выход удержанием Esc» (07.08.2026): аварийный выход
+  // больше не нужен, потому что урок закрывается сам по звонку.
+  //
+  // Учителя не запираем никогда — флаг приходит пропом, и снятие блокировки
+  // (этап кончился, урок завершён) сразу возвращает обычные Esc и кнопку.
+  const заперт = isFull && lockedUntilStageEnds && !isTeacher;
 
   useEffect(() => {
     if (!isFull) return;
-    // При holdToExit коротким Esc не выходим — этим занимается эффект ниже.
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !holdToExit) setIsFull(false); };
+    // Заперт — Esc не выводит вовсе; эффект ниже показывает подсказку.
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !заперт) setIsFull(false); };
     window.addEventListener("keydown", onKey);
     // Пока слайд во весь экран, страница под ним скроллиться не должна.
     const prev = document.body.style.overflow;
@@ -181,66 +195,26 @@ export function SlideViewer({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-    // holdToExit в зависимостях обязателен: иначе обработчик остался бы
+    // «заперт» в зависимостях обязателен: иначе обработчик остался бы
     // замкнут на старое значение и Esc не заработал бы обратно после снятия.
-  }, [isFull, holdToExit]);
+  }, [isFull, заперт]);
 
-  // ── Выход удержанием Esc ────────────────────────────────────────────────────
-  // 0 → не держим, 1 → додержал. Считаем реальными часами: getDemoNow() —
-  // это константа для дат уроков (lib/demo-date.ts), Date.now() ею НЕ
-  // подменяется и для измерения интервалов подходит.
-  const [holdProgress, setHoldProgress] = useState(0);
-  // Счётчик коротких нажатий: каждое новое перезапускает таймер подсказки
-  // (обычный boolean не перезапустил бы — состояние не изменилось бы).
+  // ── Esc заперт: подсказка вместо выхода ──────────────────────────────────
+  // Молчать на нажатие нельзя: человек решит, что клавиатура не работает, и
+  // будет жать снова. Поэтому нажатие засчитывается и отвечает словами —
+  // но выхода не даёт.
   const [hintTick, setHintTick] = useState(0);
 
   useEffect(() => {
-    if (!holdToExit) { setHoldProgress(0); return; }
-    let raf = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let startedAt = 0;
-    const stop = () => {
-      if (raf) cancelAnimationFrame(raf);
-      if (timer) clearTimeout(timer);
-      raf = 0; timer = undefined; startedAt = 0;
-      setHoldProgress(0);
-    };
-    // Сам выход держится на setTimeout, а rAF рисует ТОЛЬКО полоску. Раньше
-    // порог срабатывал внутри rAF — и это ловилось на проверке: если страница
-    // не отрисовывается, rAF не вызывается вовсе, прогресс стоит на нуле и
-    // выйти нельзя. Выход — функция, а не анимация, и от отрисовки зависеть
-    // не должен.
-    const tick = () => {
-      setHoldProgress(Math.min(1, (Date.now() - startedAt) / EXIT_HOLD_MS));
-      raf = requestAnimationFrame(tick);
-    };
+    if (!заперт) return;
     const onDown = (e: KeyboardEvent) => {
-      // e.repeat — автоповтор при зажатой клавише, начинать отсчёт заново
-      // нельзя; startedAt страхует на случай браузера без repeat.
-      if (e.key !== "Escape" || e.repeat || startedAt) return;
+      if (e.key !== "Escape" || e.repeat) return;
       e.preventDefault();
-      startedAt = Date.now();
-      timer = setTimeout(() => { stop(); setIsFull(false); }, EXIT_HOLD_MS);
-      raf = requestAnimationFrame(tick);
+      setHintTick((n) => n + 1);
     };
-    const onUp = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || !startedAt) return;
-      const held = Date.now() - startedAt;
-      stop();
-      if (held < EXIT_HOLD_MS) setHintTick((n) => n + 1);
-    };
-    // Уход со вкладки во время удержания не должен «дожать» выход втихую.
     window.addEventListener("keydown", onDown);
-    window.addEventListener("keyup", onUp);
-    window.addEventListener("blur", stop);
-    return () => {
-      window.removeEventListener("keydown", onDown);
-      window.removeEventListener("keyup", onUp);
-      window.removeEventListener("blur", stop);
-      if (raf) cancelAnimationFrame(raf);
-      if (timer) clearTimeout(timer);
-    };
-  }, [holdToExit]);
+    return () => window.removeEventListener("keydown", onDown);
+  }, [заперт]);
 
   useEffect(() => {
     if (hintTick === 0) return;
@@ -248,17 +222,10 @@ export function SlideViewer({
     return () => clearTimeout(id);
   }, [hintTick]);
 
-  // Кнопка закрытия: у учителя и у разблокированного ученика — сразу, у
-  // запертого — через EXIT_BUTTON_DELAY_MS.
-  // Инициализация не `false`: у учителя и в незапертых местах кнопка должна
-  // быть с первого кадра, а не появляться после первого эффекта.
-  const [exitButtonReady, setExitButtonReady] = useState(!(lockedUntilStageEnds && !isTeacher));
-  useEffect(() => {
-    if (!holdToExit) { setExitButtonReady(true); return; }
-    setExitButtonReady(false);
-    const id = setTimeout(() => setExitButtonReady(true), EXIT_BUTTON_DELAY_MS);
-    return () => clearTimeout(id);
-  }, [holdToExit]);
+  // Раньше кнопка появлялась запертому ученику через задержку — как запасной
+  // выход. Запасного выхода больше нет: пока этап идёт, кнопки у него нет
+  // совсем, а у учителя и у незапертого она с первого кадра.
+  const exitButtonReady = !(lockedUntilStageEnds && !isTeacher);
 
   const slide = slides[current];
   if (!slide) return null;
@@ -395,23 +362,8 @@ export function SlideViewer({
         </button>
       )}
 
-      {/* Индикатор удержания — без него непонятно, что нажатие вообще
-          засчиталось и сколько ещё держать. */}
-      {holdProgress > 0 && (
-        <div
-          role="status"
-          className="pointer-events-none absolute left-1/2 top-6 z-20 -translate-x-1/2 rounded-2xl bg-black/70 px-4 py-2.5 backdrop-blur-sm"
-        >
-          <p className="mb-1.5 text-center text-xs font-medium text-white/90">{t.holdingExit}</p>
-          <div className="h-1 w-40 overflow-hidden rounded-full bg-white/25">
-            <div className="h-full rounded-full bg-white" style={{ width: `${Math.round(holdProgress * 100)}%` }} />
-          </div>
-        </div>
-      )}
-
-      {/* Подсказка на короткое нажатие — единственное место, где ученик
-          узнаёт про удержание, поэтому текст называет клавишу явно. */}
-      {hintTick > 0 && holdProgress === 0 && (
+      {/* Ответ на нажатие Esc: выйти нельзя и почему. */}
+      {hintTick > 0 && (
         <div
           role="status"
           className="pointer-events-none absolute left-1/2 top-6 z-20 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-black/70 px-4 py-2.5 text-xs font-medium text-white/90 backdrop-blur-sm"

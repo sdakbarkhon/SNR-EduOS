@@ -2566,7 +2566,6 @@ export interface Dictionary {
       /** Ученику на короткое нажатие Esc, пока этап активен. */
       lockedHint: string;
       /** Ученику, пока он удерживает Esc (рядом с индикатором прогресса). */
-      holdingExit: string;
     };
     contentSource: {
       label: string;

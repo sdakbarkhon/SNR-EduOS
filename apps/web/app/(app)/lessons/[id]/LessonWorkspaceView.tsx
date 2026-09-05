@@ -638,6 +638,13 @@ export function LessonWorkspaceView({
   const activeMiddleStage = allMiddleStages.find((s) => s.id === activeStageId) ?? null;
   const activePos = activeMiddleStage?.position ?? -1;
   const isCompleted = lesson.status === "completed";
+  // 06.09.2026 — ПОКА УРОК ИДЁТ, УЧЕНИК ИЗ НЕГО НЕ ВЫХОДИТ. Решение
+  // заказчика, отменяющее кнопку «Выйти из урока» (Пачка 3, задача 1).
+  // Аварийного выхода не нужно: урок закрывается сам по звонку.
+  //
+  // До старта кнопка остаётся: урок ещё не идёт, и держать человека на
+  // экране, где ничего не происходит, не за что.
+  const идётУрок = lesson.status === "in_progress";
 
   // Пачка 3, Задача 1 — "Выйти из урока": ученик просто покидает экран урока
   // (клиентская навигация), урок НЕ завершается для остальных. Раньше эта
@@ -1073,7 +1080,7 @@ export function LessonWorkspaceView({
                 {dl.reloadPage}
               </button>
             )}
-            {!isCompleted && (
+            {!isCompleted && !идётУрок && (
               <button
                 onClick={handleLeaveLesson}
                 className="flex items-center gap-2 rounded-[11px] border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100"
@@ -1162,7 +1169,7 @@ export function LessonWorkspaceView({
               <RefreshCw className="h-4 w-4" />
             </button>
           )}
-          {!isCompleted && (
+          {!isCompleted && !идётУрок && (
             <button
               onClick={handleLeaveLesson}
               title={dl.leaveLessonBtn}

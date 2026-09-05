@@ -2492,8 +2492,7 @@ export const ru: Dictionary = {
       fullscreen: "Во весь экран",
       exitFullscreen: "Выйти из полноэкранного режима (Esc)",
       fullscreenTitle: "Презентация",
-      lockedHint: "Презентация идёт. Удерживайте Esc чтобы выйти",
-      holdingExit: "Удерживайте Esc…",
+      lockedHint: "Презентация идёт — выйти можно будет, когда учитель закончит этап",
     },
     contentSource: {
       label: "Источник контента",

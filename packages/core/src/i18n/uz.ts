@@ -2485,8 +2485,7 @@ export const uz: Dictionary = {
       fullscreen: "Butun ekran",
       exitFullscreen: "Butun ekrandan chiqish (Esc)",
       fullscreenTitle: "Taqdimot",
-      lockedHint: "Taqdimot davom etmoqda. Chiqish uchun Esc tugmasini bosib turing",
-      holdingExit: "Esc tugmasini ushlab turing…",
+      lockedHint: "Taqdimot davom etmoqda — o‘qituvchi bosqichni tugatgach chiqish mumkin bo‘ladi",
     },
     contentSource: {
       label: "Kontent manbasi",
