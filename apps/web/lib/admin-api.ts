@@ -755,6 +755,90 @@ export type TeacherDeletionImpact = {
   blocked: boolean;
 };
 
+/**
+ * ЧТО ТЕРЯЕТ УЧЕНИК, СНЯТЫЙ С ГРУППЫ. Пункт 105, 06.09.2026.
+ *
+ * ЗАПРЕТА НЕТ И НЕ БУДЕТ: уйти из группы — законное состояние, решение
+ * заказчика. Но уходит человек не в пустоту, а от расписания, заданий и
+ * одноклассников, и увидеть это он должен ДО снятия, а не после.
+ *
+ * ЧТО СЧИТАЕМ И ПОЧЕМУ ИМЕННО ЭТО:
+ *   • уроки и задания — они приходят через группу, и вместе с ней исчезают
+ *     с экрана целиком;
+ *   • оценки — НЕ исчезают: они привязаны к самому ученику. Показываем
+ *     отдельным числом, чтобы админ не боялся их потерять;
+ *   • чат класса — уходит: триггер `tg_student_group_chat` снимает участие
+ *     при выходе из группы. Сообщения остаются, их автор хранится в самом
+ *     сообщении;
+ *   • личные чаты с учителями — ОСТАЮТСЯ: тот же триггер создаёт их при
+ *     входе в группу, но при выходе не убирает ничего.
+ */
+export type StudentGroupLossImpact = {
+  /** Название группы, из которой уходит. */
+  groupName: string;
+  /** Уроки этой группы — исчезнут из расписания. */
+  lessons: number;
+  /** Задания этой группы — исчезнут из списка. */
+  homework: number;
+  /** Оценки ученика — ОСТАЮТСЯ, показываются ради спокойствия. */
+  grades: number;
+  /** Чат класса, из которого его выведет триггер. 1 или 0. */
+  classChats: number;
+  /** Личные чаты с учителями — остаются как были. */
+  directChats: number;
+};
+
+export async function getStudentGroupLossImpact(
+  studentId: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+): Promise<StudentGroupLossImpact | null> {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "students", studentId, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+
+  const { data: связи } = await anySb
+    .from("student_groups").select("group_id, groups(name)").eq("student_id", studentId);
+  const первая = ((связи ?? []) as Array<{ group_id: string; groups: { name: string } | null }>)[0];
+  // Группы нет вовсе — терять нечего, и показывать нечего.
+  if (!первая) return null;
+
+  const { data: ученик } = await anySb
+    .from("students").select("user_id").eq("id", studentId).maybeSingle();
+  const userId = (ученик as { user_id: string | null } | null)?.user_id ?? null;
+
+  const счёт = async (table: string, column: string, value: string) => {
+    const { count, error } = await anySb.from(table).select(column, { count: "exact", head: true }).eq(column, value);
+    if (error) throw error;
+    return count ?? 0;
+  };
+
+  const [lessons, homework, grades] = await Promise.all([
+    счёт("lessons", "group_id", первая.group_id),
+    счёт("homework", "group_id", первая.group_id),
+    счёт("lesson_grades", "student_id", studentId),
+  ]);
+
+  let classChats = 0;
+  let directChats = 0;
+  if (userId) {
+    const { data: ветки } = await anySb
+      .from("chat_participants").select("thread_id, chat_threads(kind, group_id)").eq("user_id", userId);
+    for (const r of (ветки ?? []) as Array<{ chat_threads: { kind: string; group_id: string | null } | null }>) {
+      const т = r.chat_threads;
+      if (!т) continue;
+      if (т.group_id === первая.group_id && т.kind === "group") classChats += 1;
+      else if (т.kind === "direct") directChats += 1;
+    }
+  }
+
+  return {
+    groupName: первая.groups?.name ?? "—",
+    lessons, homework, grades, classChats, directChats,
+  };
+}
+
 export async function getTeacherDeletionImpact(
   teacherId: string,
   callerSchoolId: string,

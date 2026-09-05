@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw, Wallet } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
@@ -15,6 +15,7 @@ import { useSubmitGuard } from "@/lib/use-submit-guard";
 import {
   actionCreateStudent,
   actionUpdateStudent,
+  actionStudentGroupLossImpact,
   actionResetStudentPassword,
   actionTopUpStudentBalance,
   actionDeleteStudent,
@@ -406,6 +407,7 @@ export function StudentsView({
             groups={groups}
             isPending={isPending}
             t={t}
+            schoolId={schoolId}
             onClose={() => setModal(null)}
             onSubmit={async (fd) => {
               startTransition(async () => {
@@ -698,6 +700,7 @@ function EditStudentModal({
   groups,
   isPending,
   t,
+  schoolId,
   onClose,
   onSubmit,
 }: {
@@ -705,10 +708,17 @@ function EditStudentModal({
   groups: Group[];
   isPending: boolean;
   t: AdminDict;
+  /** Школа вызывающего: у админа её нет в пропсах, у менеджера обязательна. */
+  schoolId?: string;
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
 }) {
   const currentGroupId = student.student_groups[0]?.groups?.id ?? "";
+  // ПРЕДУПРЕЖДЕНИЕ, А НЕ ЗАПРЕТ. Пункт 105, 06.09.2026. Уйти из группы —
+  // законное состояние, и мешать этому нельзя. Но человек, снимающий группу,
+  // должен видеть ДО нажатия, что именно у ученика пропадёт, а что останется.
+  const [выбранная, setВыбранная] = useState(currentGroupId);
+  const снимают = currentGroupId !== "" && выбранная === "";
 
   return (
     <ModalCard title={t.editStudentTitle} onClose={onClose}>
@@ -735,13 +745,15 @@ function EditStudentModal({
         <input type="hidden" name={origName("google_email")} defaultValue={student.google_email ?? ""} />
         <GoogleEmailField defaultValue={student.google_email} placeholder="alisher@gmail.com" />
         <Field label={t.fieldGroup}>
-          <Select name="group_id" defaultValue={currentGroupId}>
+          <Select name="group_id" value={выбранная} onChange={(e) => setВыбранная(e.target.value)}>
             <option value="">{t.noGroupOption}</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
           </Select>
         </Field>
+
+        {снимают && <LeaveGroupWarning studentId={student.id} schoolId={schoolId} t={t} />}
 
         {/* Те же блоки, что и при создании: 31 существующий ученик стоит с
             пустыми полями, админ дозаполняет их, когда понадобится. */}
@@ -834,5 +846,57 @@ function DeleteStudentModal({
         </button>
       </div>
     </ModalCard>
+  );
+}
+
+/**
+ * ЧТО ТЕРЯЕТ УЧЕНИК, СНЯТЫЙ С ГРУППЫ. Пункт 105, 06.09.2026.
+ *
+ * Числа приходят с сервера и показываются ДО нажатия «Сохранить» — тем же
+ * приёмом, что последствия удаления учителя. Ничего не запрещает: кнопка
+ * остаётся живой, и последняя строка прямо говорит, что так можно.
+ */
+function LeaveGroupWarning({
+  studentId, schoolId, t,
+}: {
+  studentId: string;
+  schoolId?: string;
+  t: AdminDict;
+}) {
+  const [итог, setИтог] = useState<{
+    groupName: string; lessons: number; homework: number;
+    grades: number; classChats: number; directChats: number;
+  } | null>(null);
+  const [сорвалось, setСорвалось] = useState(false);
+
+  useEffect(() => {
+    let жив = true;
+    unwrap(actionStudentGroupLossImpact(studentId, schoolId))
+      .then((r) => { if (жив) setИтог(r ?? null); })
+      .catch(() => { if (жив) setСорвалось(true); });
+    return () => { жив = false; };
+  }, [studentId, schoolId]);
+
+  if (сорвалось) return null;
+  if (!итог) return <p className="text-xs text-gray-500">{t.impactLoading}</p>;
+
+  return (
+    <div className="space-y-1.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
+      <p className="text-sm font-bold text-amber-900">
+        {t.leaveGroupTitle.replace("{group}", итог.groupName)}
+      </p>
+      <p className="text-xs text-amber-900">
+        {t.leaveGroupLoses
+          .replace("{lessons}", String(итог.lessons))
+          .replace("{homework}", String(итог.homework))}
+      </p>
+      <p className="text-xs text-amber-900">
+        {t.leaveGroupKeeps
+          .replace("{grades}", String(итог.grades))
+          .replace("{chats}", String(итог.directChats))}
+      </p>
+      {итог.classChats > 0 && <p className="text-xs text-amber-900">{t.leaveGroupChatLeaves}</p>}
+      <p className="pt-1 text-[11px] leading-relaxed text-amber-800">{t.leaveGroupAllowed}</p>
+    </div>
   );
 }

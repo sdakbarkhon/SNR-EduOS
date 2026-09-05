@@ -307,6 +307,9 @@ export interface Dictionary {
     greeting: string; // "Привет, {name}! 👋"
     nextLesson: string;
     noNextLesson: string;
+    /** Ученика не записали ни в одну группу: без этих слов экран просто пуст. */
+    noGroupTitle: string;
+    noGroupHint: string;
     myTasks: string;
     activeTasks: string; // "{count} активных"
     weekProgress: string;
@@ -829,6 +832,14 @@ export interface Dictionary {
     addGroupTitle: string;
     editGroupTitle: string;
     deleteGroupTitle: string;
+    /** Пункт 105. Предупреждение при снятии ученика с группы: числа ДО действия. */
+    leaveGroupTitle: string;        // {group}
+    leaveGroupLoses: string;        // {lessons}, {homework}
+    leaveGroupKeeps: string;        // {grades}, {chats}
+    leaveGroupChatLeaves: string;
+    leaveGroupAllowed: string;
+    /** Сколько учеников останется без группы при её удалении. */
+    deleteGroupStudents: string;    // {n}
     deleteGroupConfirm: string;
     fieldGroupName: string;
     fieldSubject: string;

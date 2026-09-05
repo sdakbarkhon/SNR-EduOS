@@ -4,6 +4,7 @@ import {
   createStudent, updateStudent, resetStudentPassword, deleteStudent,
   createTeacher, updateTeacher, resetTeacherPassword, deleteTeacher,
   findTeacherByLogin, addTeacherToSchool, dismissTeacherFromSchool,
+  getStudentGroupLossImpact,
   createGroup, updateGroup, deleteGroup, createGroupsBulk,
   quickStartGroup, getQuickStartData,
   createSchoolSubject, updateSchoolSubject, setSchoolSubjectActive,
@@ -183,6 +184,14 @@ export async function actionTopUpStudentBalance(formData: FormData) {
       studentId, amount, note, callerSchoolId: schoolId, callerIsSuperAdmin: isSuperAdmin,
     });
     revalidatePath("/admin/students");
+  });
+}
+
+/** Что потеряет ученик, если снять его с группы. Пункт 105: числа ДО действия. */
+export async function actionStudentGroupLossImpact(studentId: string, requestedSchoolId?: string | null) {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
+    return getStudentGroupLossImpact(studentId, schoolId, isSuperAdmin);
   });
 }
 

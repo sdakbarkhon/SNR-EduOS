@@ -735,6 +735,15 @@ export function GroupsView({
             <p className="mb-2 text-sm text-gray-600">
               {t.deleteGroupConfirm.replace("{name}", modal.group.name)}
             </p>
+            {/* ЧИСЛО ДО ДЕЙСТВИЯ. Пункт 105, 06.09.2026: удаление группы
+                уносит связи её учеников каскадом, и молча. Сколько людей
+                останется без группы, админ должен знать ДО нажатия — список
+                группы у экрана уже есть, спрашивать сервер не за чем. */}
+            {modal.group.student_groups.length > 0 && (
+              <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                {t.deleteGroupStudents.replace("{n}", String(modal.group.student_groups.length))}
+              </p>
+            )}
             <p className="mb-6 text-xs font-semibold text-red-600">{t.deleteWarning}</p>
             <div className="flex gap-3">
               <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>

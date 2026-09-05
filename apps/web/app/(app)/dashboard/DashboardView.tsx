@@ -342,6 +342,20 @@ export function DashboardView({
             <p className="mt-1.5 text-[15px] font-semibold text-[#9A9AB5] md:text-base">{greeting}</p>
           </div>
 
+          {/* УЧЕНИК БЕЗ ГРУППЫ. Пункт 105, 06.09.2026.
+              Раньше он видел просто пустые карточки: ноль уроков, ноль
+              заданий, пустой класс в шапке — и ни слова о причине. Пустой
+              экран без объяснения человек читает как поломку и идёт жаловаться
+              на систему, хотя система работает верно.
+              Оценки и переписка при этом целы — про это сказано отдельно,
+              чтобы никто не решил, что всё пропало. */}
+          {groups.length === 0 && (
+            <div className="rounded-[20px] border border-amber-100 bg-amber-50 p-5">
+              <h2 className="text-[17px] font-black text-amber-900">{t.noGroupTitle}</h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-amber-800">{t.noGroupHint}</p>
+            </div>
+          )}
+
           {/* HERO ROW: Факт дня + Серия успехов */}
           <div className="flex flex-col gap-6 lg:flex-row">
             {/* Факт дня */}
