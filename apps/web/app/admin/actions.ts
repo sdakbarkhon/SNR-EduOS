@@ -3,6 +3,7 @@
 import {
   createStudent, updateStudent, resetStudentPassword, deleteStudent,
   createTeacher, updateTeacher, resetTeacherPassword, deleteTeacher,
+  findTeacherByLogin, addTeacherToSchool, dismissTeacherFromSchool,
   createGroup, updateGroup, deleteGroup, createGroupsBulk,
   quickStartGroup, getQuickStartData,
   createSchoolSubject, updateSchoolSubject, setSchoolSubjectActive,
@@ -305,6 +306,50 @@ export async function actionDeleteTeacher(teacherId: string, userId: string, req
 
 /** Z.2.4 — назначить или снять учителя одним действием: subjects.teacher_id,
  *  group_teachers и (в реальных школах) subject_slug. */
+/**
+ * УЧИТЕЛЬ, КОТОРЫЙ УЖЕ ГДЕ-ТО РАБОТАЕТ: найти по логину. 06.09.2026.
+ *
+ * Школа берётся у вызывающего и уходит в поиск только затем, чтобы ответить
+ * «а у нас он уже есть?». Ни один довод не позволяет спросить про чужую школу.
+ */
+export async function actionFindTeacherByLogin(login: string, requestedSchoolId?: string | null) {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin(requestedSchoolId);
+    return findTeacherByLogin(login, schoolId);
+  });
+}
+
+/** Добавить найденного учителя в СВОЮ школу — связью, а не вторым человеком. */
+export async function actionAddTeacherToSchool(teacherId: string, requestedSchoolId?: string | null) {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin(requestedSchoolId);
+    const итог = await addTeacherToSchool(teacherId, schoolId);
+    revalidatePath("/admin/teachers");
+    revalidatePath("/admin");
+    revalidatePath("/admin/subject-assignments");
+    return итог;
+  });
+}
+
+/**
+ * Уволить из СВОЕЙ школы. Человека не трогает: снимается связь.
+ *
+ * Это НЕ замена удалению. Удаление сносит учётную запись и строку целиком и
+ * упирается в уроки и оценки; увольнение оставляет всё на месте и потому
+ * запретов не имеет.
+ */
+export async function actionDismissTeacherFromSchool(teacherId: string, requestedSchoolId?: string | null) {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin(requestedSchoolId);
+    const итог = await dismissTeacherFromSchool(teacherId, schoolId);
+    revalidatePath("/admin/teachers");
+    revalidatePath("/admin");
+    revalidatePath("/admin/subject-assignments");
+    revalidatePath("/admin/groups");
+    return итог;
+  });
+}
+
 export async function actionSetAssignmentTeacher(assignmentId: string, teacherId: string | null, requestedSchoolId?: string | null) {
   return guard(async () => {
     const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);

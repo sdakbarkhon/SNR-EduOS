@@ -572,6 +572,152 @@ export async function updateTeacher(
   return итог;
 }
 
+/**
+ * ═══ УЧИТЕЛЬ, КОТОРЫЙ УЖЕ ГДЕ-ТО РАБОТАЕТ. 06.09.2026 ══════════════════════
+ *
+ * Заводить его вторым человеком нельзя: это второй логин, второй пароль, два
+ * профиля и две половины истории — а человек один. Правильный ход — ДОБАВИТЬ
+ * СВЯЗЬ со своей школой в `teacher_schools`, ту самую, что завёл первый заход.
+ *
+ * ИЩЕТСЯ ПО ЛОГИНУ. Не по фамилии: фамилий-однофамильцев в школе бывает по
+ * трое, а логин уникален и человек его знает — он им входит. Почта не годится
+ * и подавно: у учителя её может не быть вовсе, колонка необязательная.
+ *
+ * ЧТО ОТДАЁТСЯ НАРУЖУ. Имя, логин и один признак: работает ли он уже у нас.
+ * НИ СЛОВА о том, где ещё он работает, — это штат чужой школы, и админу одной
+ * школы знать его незачем. Отвечать «такого нет», когда человек есть, тоже
+ * нельзя: тогда админ заведёт дубль, и мы получим ровно то, чего избегаем.
+ */
+export type НайденныйУчитель = {
+  teacherId: string;
+  fullName: string;
+  username: string;
+  /** Уже связан с этой школой: 'работает' — связь действует, 'уволен' —
+   *  связь есть, но снята (тогда добавление её просто вернёт). */
+  уНас: "работает" | "уволен" | null;
+};
+
+export async function findTeacherByLogin(
+  login: string,
+  callerSchoolId: string,
+): Promise<НайденныйУчитель | null> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const чистый = login.trim().toLowerCase();
+  if (!чистый) return null;
+
+  const { data: люди, error } = await anySb
+    .from("teachers").select("id, full_name, username, school_id").ilike("username", чистый);
+  if (error) throw error;
+  const найден = ((люди ?? []) as Array<{ id: string; full_name: string; username: string; school_id: string }>)[0];
+  if (!найден) return null;
+
+  const { data: связь } = await anySb
+    .from("teacher_schools").select("is_active")
+    .eq("teacher_id", найден.id).eq("school_id", callerSchoolId).maybeSingle();
+
+  return {
+    teacherId: найден.id,
+    fullName: найден.full_name,
+    username: найден.username,
+    уНас: связь ? ((связь as { is_active: boolean }).is_active ? "работает" : "уволен") : null,
+  };
+}
+
+/**
+ * Добавить уже существующего учителя в СВОЮ школу.
+ *
+ * Школа берётся у вызывающего (callerSchoolId из verifyStaff): у админа своя,
+ * у менеджера та, что он назвал и которая проверена. Довода «в какую школу»
+ * здесь нет и не будет — иначе админ одной школы смог бы вписать человека в
+ * чужую.
+ *
+ * Повторное добавление безвредно: связь есть и действует — возвращаем как
+ * есть; связь снята — включаем обратно (человека вернули на работу).
+ */
+export async function addTeacherToSchool(
+  teacherId: string,
+  callerSchoolId: string,
+): Promise<{ добавлен: boolean; вернули: boolean }> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+
+  const { data: связь } = await anySb
+    .from("teacher_schools").select("is_active")
+    .eq("teacher_id", teacherId).eq("school_id", callerSchoolId).maybeSingle();
+
+  if (связь) {
+    if ((связь as { is_active: boolean }).is_active) return { добавлен: false, вернули: false };
+    const { error } = await anySb.from("teacher_schools")
+      .update({ is_active: true }).eq("teacher_id", teacherId).eq("school_id", callerSchoolId);
+    if (error) throw error;
+    return { добавлен: true, вернули: true };
+  }
+
+  const { error } = await anySb.from("teacher_schools")
+    .insert({ teacher_id: teacherId, school_id: callerSchoolId, is_active: true });
+  if (error) throw error;
+  return { добавлен: true, вернули: false };
+}
+
+/**
+ * ═══ УВОЛИТЬ ИЗ ОДНОЙ ШКОЛЫ ═══════════════════════════════════════════════
+ *
+ * Связь СНИМАЕТСЯ, а не удаляется, и сам человек не трогается вовсе: его
+ * уроки, оценки и отметки остаются на месте, и через год видно, кто это был.
+ * Тот же выбор, что в первом заходе цепочки.
+ *
+ * ДОМАШНЯЯ ШКОЛА ПЕРЕЕЗЖАЕТ. `teachers.school_id` — запасной ход функции
+ * «моя школа»: если уволить человека из школы, на которую он указывает, а
+ * колонку не тронуть, запасной ход вернёт его туда же. Поэтому при увольнении
+ * из домашней школы колонка переставляется на любую другую действующую связь.
+ *
+ * ПОСЛЕДНЯЯ СВЯЗЬ. Переставлять некуда — колонка остаётся как была, и человек
+ * лишается доступа не ею, а тем, что действующих связей у него больше нет
+ * (миграция 267). Строка учителя при этом ЖИВА: «удалить совсем» — отдельное
+ * действие со своими запретами (уроки, оценки), и подменять его увольнением
+ * нельзя.
+ */
+export async function dismissTeacherFromSchool(
+  teacherId: string,
+  callerSchoolId: string,
+): Promise<{ осталосьШкол: number; домашняяПереехала: boolean }> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+
+  const { data: связь } = await anySb
+    .from("teacher_schools").select("is_active")
+    .eq("teacher_id", teacherId).eq("school_id", callerSchoolId).maybeSingle();
+  if (!связь || !(связь as { is_active: boolean }).is_active) {
+    throw new Error("Этот учитель у вас не числится");
+  }
+
+  const { error: снятьErr } = await anySb.from("teacher_schools")
+    .update({ is_active: false }).eq("teacher_id", teacherId).eq("school_id", callerSchoolId);
+  if (снятьErr) throw снятьErr;
+
+  const { data: остальные } = await anySb
+    .from("teacher_schools").select("school_id")
+    .eq("teacher_id", teacherId).eq("is_active", true);
+  const школы = ((остальные ?? []) as Array<{ school_id: string }>).map((r) => r.school_id);
+
+  const { data: строка } = await anySb
+    .from("teachers").select("school_id").eq("id", teacherId).maybeSingle();
+  const домашняя = (строка as { school_id: string } | null)?.school_id ?? null;
+
+  let переехала = false;
+  if (домашняя === callerSchoolId && школы.length > 0) {
+    const { error } = await anySb.from("teachers").update({ school_id: школы[0] }).eq("id", teacherId);
+    if (error) throw error;
+    переехала = true;
+  }
+
+  return { осталосьШкол: школы.length, домашняяПереехала: переехала };
+}
+
 export async function resetTeacherPassword(
   userId: string,
   callerSchoolId: string,

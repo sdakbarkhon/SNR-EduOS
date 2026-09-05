@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
+import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw, UserPlus, LogOut } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
@@ -16,6 +16,9 @@ import {
   actionUpdateTeacher,
   actionResetTeacherPassword,
   actionDeleteTeacher,
+  actionFindTeacherByLogin,
+  actionAddTeacherToSchool,
+  actionDismissTeacherFromSchool,
   actionTeacherDeletionImpact,
   actionSetAssignmentTeacher,
 } from "../actions";
@@ -182,7 +185,12 @@ type Modal =
   | { kind: "add" }
   | { kind: "edit"; teacher: Teacher }
   | { kind: "reset"; teacher: Teacher }
-  | { kind: "delete"; teacher: Teacher };
+  | { kind: "delete"; teacher: Teacher }
+  /** Приём человека, который уже работает в другой школе. Второго профиля не
+   *  заводим — добавляем связь со своей школой. */
+  | { kind: "attach" }
+  /** Увольнение из ОДНОЙ школы. Не удаление: человек и его история остаются. */
+  | { kind: "dismiss"; teacher: Teacher };
 
 function generatePassword(len = 8) {
   const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -309,13 +317,26 @@ export function TeachersView({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">{t.teachersTitle}</h1>
-        <button
-          onClick={() => setModal({ kind: "add" })}
-          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-        >
-          <Plus className="h-4 w-4" />
-          {t.addTeacherTitle}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Приём работающего стоит РЯДОМ с заведением нового и слева от него:
+              сначала спроси, есть ли человек в системе, и только потом заводи
+              нового. Порядок кнопок — единственная подсказка, которая тут
+              работает. */}
+          <button
+            onClick={() => setModal({ kind: "attach" })}
+            className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+          >
+            <UserPlus className="h-4 w-4" />
+            {t.addExistingBtn}
+          </button>
+          <button
+            onClick={() => setModal({ kind: "add" })}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          >
+            <Plus className="h-4 w-4" />
+            {t.addTeacherTitle}
+          </button>
+        </div>
       </div>
 
       {flashMsg && (
@@ -397,6 +418,9 @@ export function TeachersView({
                         </button>
                         <button onClick={() => setModal({ kind: "reset", teacher: tc })} className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600" title={t.resetPasswordBtn}>
                           <KeyRound className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => setModal({ kind: "dismiss", teacher: tc })} className="rounded-lg p-1.5 text-gray-400 hover:bg-orange-50 hover:text-orange-600" title={t.dismissBtn}>
+                          <LogOut className="h-4 w-4" />
                         </button>
                         <button onClick={() => setModal({ kind: "delete", teacher: tc })} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600" title={t.deleteBtn}>
                           <Trash2 className="h-4 w-4" />
@@ -530,6 +554,53 @@ export function TeachersView({
                 className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60"
               >
                 {isPending ? t.resetting : t.resetBtn}
+              </button>
+            </div>
+          </ModalCard>
+        </Backdrop>
+      )}
+
+      {modal?.kind === "attach" && (
+        <Backdrop onClose={() => setModal(null)}>
+          <ModalCard title={t.addExistingTitle} onClose={() => setModal(null)}>
+            <AttachTeacherForm
+              t={t}
+              schoolId={schoolId}
+              locale={locale as Locale}
+              onDone={(имя) => {
+                flash(t.addExistingAddedMsg.replace("{name}", имя));
+                setModal(null);
+              }}
+            />
+          </ModalCard>
+        </Backdrop>
+      )}
+
+      {modal?.kind === "dismiss" && (
+        <Backdrop onClose={() => setModal(null)}>
+          <ModalCard title={t.dismissTitle} onClose={() => setModal(null)}>
+            <p className="mb-3 text-sm text-gray-600">
+              {t.dismissConfirm.replace("{name}", modal.teacher.full_name)}
+            </p>
+            {/* Про последнюю школу предупреждаем ВСЕГДА: сколько их у человека,
+                админ одной школы знать не может — чужой штат не его дело. */}
+            <p className="mb-6 text-xs font-semibold text-orange-600">{t.dismissLastWarning}</p>
+            <div className="flex gap-3">
+              <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
+              <button
+                onClick={() => startTransition(async () => {
+                  try {
+                    await unwrap(actionDismissTeacherFromSchool(modal.teacher.id, schoolId));
+                    flash(t.dismissedMsg.replace("{name}", modal.teacher.full_name));
+                    setModal(null);
+                  } catch (e) {
+                    flash(humanizeAdminError(e, locale as Locale));
+                  }
+                })}
+                disabled={isPending}
+                className="flex-1 rounded-xl bg-orange-600 py-2.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-60"
+              >
+                {isPending ? t.deleting : t.dismissBtn}
               </button>
             </div>
           </ModalCard>
@@ -730,5 +801,110 @@ function AddTeacherForm({
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * ПРИЁМ РАБОТАЮЩЕГО: логин → поиск → добавление.
+ *
+ * Два шага, а не один, намеренно. Логин — вещь, в которой легко ошибиться на
+ * букву, а добавление связи меняет штат школы. Сначала показываем, КОГО нашли,
+ * и только потом даём кнопку добавить.
+ *
+ * Про чужие школы здесь не говорится ни слова: ответ несёт имя, логин и один
+ * признак — работает ли человек уже у нас.
+ */
+function AttachTeacherForm({
+  t, schoolId, locale, onDone,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
+  /** У админа своей школы её нет в пропсах вовсе — школу подставит verifyStaff
+   *  на сервере. Приходит только у менеджера, который работает в чужой. */
+  schoolId?: string;
+  locale: Locale;
+  onDone: (имя: string) => void;
+}) {
+  const [login, setLogin] = useState("");
+  const [найден, setНайден] = useState<{ teacherId: string; fullName: string; username: string; уНас: "работает" | "уволен" | null } | null>(null);
+  const [искали, setИскали] = useState(false);
+  const [ошибка, setОшибка] = useState("");
+  const [занят, setЗанят] = useState(false);
+
+  async function найти() {
+    if (!login.trim() || занят) return;
+    setЗанят(true); setОшибка(""); setНайден(null); setИскали(false);
+    try {
+      const r = await unwrap(actionFindTeacherByLogin(login, schoolId));
+      setНайден(r ?? null);
+      setИскали(true);
+    } catch (e) {
+      setОшибка(humanizeAdminError(e, locale));
+    } finally {
+      setЗанят(false);
+    }
+  }
+
+  async function добавить() {
+    if (!найден || занят) return;
+    setЗанят(true); setОшибка("");
+    try {
+      await unwrap(actionAddTeacherToSchool(найден.teacherId, schoolId));
+      onDone(найден.fullName);
+    } catch (e) {
+      setОшибка(humanizeAdminError(e, locale));
+      setЗанят(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-600">{t.addExistingHint}</p>
+      <div className="flex gap-2">
+        <input
+          value={login}
+          onChange={(e) => setLogin(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void найти(); }}
+          placeholder={t.addExistingLogin}
+          className="flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-400"
+        />
+        <button
+          onClick={() => void найти()}
+          disabled={занят || !login.trim()}
+          className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+        >
+          {t.addExistingFind}
+        </button>
+      </div>
+
+      {искали && !найден && (
+        <p className="rounded-xl bg-gray-50 px-3 py-2.5 text-sm text-gray-600">{t.addExistingNotFound}</p>
+      )}
+
+      {найден && (
+        <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+          <p className="text-sm font-semibold text-emerald-900">
+            {t.addExistingFound.replace("{name}", найден.fullName).replace("{login}", найден.username)}
+          </p>
+          {найден.уНас === "работает" && (
+            <p className="text-xs text-emerald-800">{t.addExistingHere.replace("{name}", найден.fullName)}</p>
+          )}
+          {найден.уНас === "уволен" && (
+            <p className="text-xs text-emerald-800">{t.addExistingWillReturn.replace("{name}", найден.fullName)}</p>
+          )}
+          {найден.уНас !== "работает" && (
+            <button
+              onClick={() => void добавить()}
+              disabled={занят}
+              className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {t.addExistingAdd}
+            </button>
+          )}
+        </div>
+      )}
+
+      {ошибка && <p className="text-sm text-red-600">{ошибка}</p>}
+    </div>
   );
 }

@@ -779,6 +779,24 @@ export interface Dictionary {
     addTeacherTitle: string;
     editTeacherTitle: string;
     deleteTeacherTitle: string;
+    /** Приём учителя, который уже работает в другой школе: связь, а не второй человек. */
+    addExistingBtn: string;
+    addExistingTitle: string;
+    addExistingHint: string;
+    addExistingLogin: string;
+    addExistingFind: string;
+    addExistingNotFound: string;
+    addExistingFound: string;      // {name}, {login}
+    addExistingHere: string;       // {name}
+    addExistingWillReturn: string; // {name}
+    addExistingAdd: string;
+    addExistingAddedMsg: string;   // {name}
+    /** Увольнение из ОДНОЙ школы. Человек и его история остаются. */
+    dismissBtn: string;
+    dismissTitle: string;
+    dismissConfirm: string;        // {name}
+    dismissLastWarning: string;
+    dismissedMsg: string;          // {name}
     deleteTeacherConfirm: string;
     deleteTeacherBlocked: string;
     /** Z.2.3 — честное подтверждение удаления: что мешает и что уйдёт следом. */
