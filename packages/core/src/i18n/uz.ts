@@ -1483,6 +1483,7 @@ export const uz: Dictionary = {
     invoiceAmountInvalid: "Hisob summasi — so'mdagi butun son, noldan kam emas.",
     invoiceReasonRequired: "Sababni yozing: u hisobga tushadi va ota-onaga summa nega o'zgarganini tushuntiradi.",
     teacherHasLessons: "O'chirib bo'lmaydi: o'qituvchi {count} ta dars olib boradi. Avval fanlarni boshqasiga topshiring.",
+    subjectLastTeacher: "Oxirgi o‘qituvchini olib tashlab bo‘lmaydi: fanda {count} ta dars bor, o‘qituvchisiz ularni hech kim ko‘rmaydi. Boshqasini tayinlang — almashtirishga doim ruxsat.",
     teacherHasGrades: "O'chirib bo'lmaydi: {count} ta baho va qaror shu o'qituvchi nomida — ularni muallifsiz qoldirib bo'lmaydi.",
     subjectInUse: "O'chirib bo'lmaydi: {lessons} dars, {homework} topshiriq, {plans} o'quv reja. Ularni olib tashlang yoki fanni yashiring.",
     catalogSubjectInUse: "O'chirib bo'lmaydi: fan {assignments} marta biriktirilgan ({lessons} dars, {homework} topshiriq, {plans} reja, {materials} kafedra materiali). Uni yashirish mumkin.",

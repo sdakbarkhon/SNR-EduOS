@@ -69,6 +69,9 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
     if (kind === "TEACHER_GRADES") {
       return t.teacherHasGrades.replace("{count}", String(num(0)));
     }
+    if (kind === "SUBJECT_LAST_TEACHER") {
+      return t.subjectLastTeacher.replace("{count}", String(num(0)));
+    }
     if (kind === "SUBJECT_IN_USE") {
       return t.subjectInUse
         .replace("{lessons}", String(num(0)))

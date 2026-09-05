@@ -1483,6 +1483,7 @@ export const en: Dictionary = {
     invoiceAmountInvalid: "The invoice amount must be a whole number of UZS, zero or more.",
     invoiceReasonRequired: "Write a reason: it goes into the invoice and explains to the parent why the amount changed.",
     teacherHasLessons: "Cannot delete: the teacher runs {count} lessons. Hand the subjects over to someone else first.",
+    subjectLastTeacher: "Cannot remove the last teacher: the subject has {count} lessons, and without a teacher nobody will see them. Assign someone else — replacing is always allowed.",
     teacherHasGrades: "Cannot delete: {count} grades and decisions are signed by this teacher and cannot be left without an author.",
     subjectInUse: "Cannot delete: {lessons} lessons, {homework} assignments, {plans} curriculum plans. Remove them or hide the subject.",
     catalogSubjectInUse: "Cannot delete: the subject is assigned {assignments} times ({lessons} lessons, {homework} assignments, {plans} plans, {materials} department materials). You can hide it instead.",

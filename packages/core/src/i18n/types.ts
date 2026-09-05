@@ -1515,7 +1515,9 @@ export interface Dictionary {
     invoiceNotFound: string;
     invoiceAmountInvalid: string;
     invoiceReasonRequired: string;
-    teacherHasLessons: string;      // "{count}"
+    teacherHasLessons: string;
+    /** Снятие последнего учителя с предмета, по которому идут уроки. {count} — сколько уроков мешает. */
+    subjectLastTeacher: string;      // "{count}"
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"
     catalogSubjectInUse: string;    // "{assignments} {lessons} {homework} {plans} {materials}"

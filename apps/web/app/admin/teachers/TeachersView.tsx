@@ -31,9 +31,20 @@ import type { TeacherDeletionImpact } from "@/lib/admin-api";
  * спрашивает сервер и показывает числа: что помешает и что уйдёт следом.
  */
 function DeleteTeacherImpact({
-  teacherId, t, onLoaded,
+  teacherId, schoolId, t, onLoaded,
 }: {
   teacherId: string;
+  /**
+   * Школа вызывающего. У админа её нет в пропсах — подставит verifyStaff; у
+   * МЕНЕДЖЕРА она обязательна.
+   *
+   * 06.09.2026, пункт 104. Довод сюда не передавался вовсе, и у менеджера
+   * подсчёт падал на MANAGER_SCHOOL_REQUIRED: предупреждение не показывалось,
+   * а кнопка «Удалить» гаснет по `impact?.blocked`, которого при отказе нет —
+   * то есть она оставалась ЖИВОЙ. Удаление всё равно отбивал сервер, но
+   * человек узнавал причину ПОСЛЕ нажатия, а не до.
+   */
+  schoolId?: string;
   t: AdminDict;
   onLoaded: (impact: TeacherDeletionImpact | null) => void;
 }) {
@@ -43,13 +54,13 @@ function DeleteTeacherImpact({
   useEffect(() => {
     let alive = true;
     onLoaded(null);
-    unwrap(actionTeacherDeletionImpact(teacherId))
+    unwrap(actionTeacherDeletionImpact(teacherId, schoolId))
       .then((res) => { if (alive) { setImpact(res); onLoaded(res); } })
       .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
     // onLoaded — сеттер из useState родителя, стабилен между рендерами
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacherId]);
+  }, [teacherId, schoolId]);
 
   if (failed) return <p className="mb-4 text-xs text-gray-500">{t.deleteWarning}</p>;
   if (!impact) return <p className="mb-4 text-xs text-gray-500">{t.impactLoading}</p>;
@@ -611,7 +622,7 @@ export function TeachersView({
         <Backdrop onClose={() => setModal(null)}>
           <ModalCard title={t.deleteTeacherTitle} onClose={() => setModal(null)}>
             <p className="mb-3 text-sm text-gray-600">{t.deleteTeacherConfirm.replace("{name}", modal.teacher.full_name)}</p>
-            <DeleteTeacherImpact teacherId={modal.teacher.id} t={t} onLoaded={setImpact} />
+            <DeleteTeacherImpact teacherId={modal.teacher.id} schoolId={schoolId} t={t} onLoaded={setImpact} />
             <p className="mb-6 text-xs font-semibold text-red-600">{t.deleteWarning}</p>
             <div className="flex gap-3">
               <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>

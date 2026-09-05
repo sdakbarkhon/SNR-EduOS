@@ -2243,6 +2243,29 @@ export async function setAssignmentTeacher(
     await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
   }
 
+  // ПРЕДМЕТ С УРОКАМИ НЕ ОСТАЁТСЯ БЕЗ УЧИТЕЛЯ. Пункт 104, 06.09.2026.
+  //
+  // Снятие последнего учителя с предмета, по которому уже идут уроки, — не
+  // «освободить место», а спрятать уроки от того, кто их ведёт. Правила
+  // доступа учителя ищут его через `subjects.teacher_id`: обнули колонку, и
+  // уроки останутся на месте, ученик и админ будут их видеть, а учитель — ни
+  // одного. Ровно это и случилось с математикой десятого класса: семь уроков
+  // существуют, вести их некому.
+  //
+  // ЗАМЕНА УЧИТЕЛЯ РАЗРЕШЕНА ВСЕГДА. Запрет только на пустоту: передать
+  // предмет другому человеку — обычная жизнь школы, и мешать ей незачем.
+  //
+  // Отказ называет ЧИСЛО уроков — как у последнего админа школы и у предмета,
+  // которым занят урок. «Нельзя» без числа человек читает как поломку.
+  if (teacherId === null && previous) {
+    const { count, error: cntErr } = await anySb
+      .from("lessons").select("id", { count: "exact", head: true }).eq("subject_id", assignmentId);
+    if (cntErr) throw cntErr;
+    if ((count ?? 0) > 0) {
+      throw new Error(`BLOCKED_SUBJECT_LAST_TEACHER:${count}`);
+    }
+  }
+
   const { error: upErr } = await anySb
     .from("subjects").update({ teacher_id: teacherId }).eq("id", assignmentId);
   if (upErr) throw upErr;
