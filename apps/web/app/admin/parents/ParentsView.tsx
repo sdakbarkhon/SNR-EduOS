@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { Plus, Copy, RefreshCw, Trash2, Pencil, KeyRound } from "lucide-react";
-import { getDictionary } from "@snr/core";
+import { getDictionary, format, сообщениеОПеременах } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
@@ -12,6 +12,7 @@ import { unwrap } from "@/lib/action-result";
 import { origName } from "@/lib/form-patch";
 import { AdminPhoneInput, digitsFromStored, storedFromDigits } from "@/components/admin/PhoneInput";
 import { actionParentPendingCode, actionDeleteParent, actionUpdateParent, actionResetParentPassword } from "./actions";
+import { useFlash, FlashBanner } from "@/components/admin/Flash";
 
 type ParentRow = {
   id: string;
@@ -65,7 +66,9 @@ function EditParentModal({
   allStudents: Student[];
   schoolId?: string;
   onClose: () => void;
-  onSaved: () => void;
+  /** Несёт готовую фразу: что именно изменилось, знает только форма — у неё
+   *  под рукой и прежний список детей, и новый. */
+  onSaved: (сообщение: string) => void;
   onError: (msg: string) => void;
   t: ReturnType<typeof getDictionary>["adminParents"];
   locale: Locale;
@@ -126,7 +129,57 @@ function EditParentModal({
         fd.set(origName("google_email"), parent.googleEmail ?? "");
         selectedIds.forEach((id) => fd.append("student_ids", id));
         await unwrap(actionUpdateParent(сШколой(fd)));
-        onSaved();
+
+        /*
+         * «ДАННЫЕ РОДИТЕЛЯ СОХРАНЕНЫ» ПРЯТАЛО СМЕНУ ДЕТЕЙ. Пункт 214,
+         * 06.09.2026.
+         *
+         * Одна форма правит имя, телефон, почту — И СПИСОК ДЕТЕЙ. Список
+         * заменяется целиком (updateParent сносит все связи и вставляет
+         * заново), то есть за одним «Сохранить» родитель может получить
+         * доступ к чужому ребёнку или потерять своего, а фраза была одна на
+         * всё.
+         *
+         * Дифф считается здесь: и прежний список (parent.childIds), и новый
+         * (selectedIds), и имена (allStudents) лежат рядом — сервер о разнице
+         * не знает вовсе, он видит только новый список.
+         *
+         * СРАВНИВАЕМ ЗНАЧЕНИЯ, А НЕ ФАКТ ОТПРАВКИ. Имя, телефон и почта
+         * уходят на сервер всегда; сказать «изменена почта» по одному тому,
+         * что поле отправлено, значило бы соврать.
+         */
+        const имя = (id: string) => {
+          const прямо = allStudents.find((s) => s.id === id)?.full_name;
+          if (прямо) return прямо;
+          // Ребёнка могло не остаться в списке школы — тогда имя берём из
+          // самой карточки: children и childIds строятся одним проходом.
+          const место = parent.childIds.indexOf(id);
+          return место >= 0 ? parent.children[место] ?? "?" : "?";
+        };
+        const привязаны = selectedIds.filter((id) => !parent.childIds.includes(id));
+        const отвязаны = parent.childIds.filter((id) => !selectedIds.includes(id));
+
+        // Одного ребёнка называем в единственном числе: «привязаны дети:
+        // Алишер Каримов» человек читает как ошибку экрана.
+        const весомые: string[] = [];
+        if (привязаны.length > 0) {
+          весомые.push(format(привязаны.length === 1 ? t.parentChildAddedMsg : t.parentChildrenAddedMsg,
+            { names: привязаны.map(имя).join(", ") }));
+        }
+        if (отвязаны.length > 0) {
+          весомые.push(format(отвязаны.length === 1 ? t.parentChildRemovedMsg : t.parentChildrenRemovedMsg,
+            { names: отвязаны.map(имя).join(", ") }));
+        }
+
+        const сведения: string[] = [];
+        if (fullName.trim() !== parent.full_name) сведения.push(t.parentDetailName);
+        if (phoneDigits !== digitsFromStored(parent.phone)) сведения.push(t.parentDetailPhone);
+        if (googleEmail.trim() !== (parent.googleEmail ?? "")) сведения.push(t.parentDetailEmail);
+
+        onSaved(сообщениеОПеременах(
+          { весомые, сведения },
+          { сведения: t.parentDetailsMsg, ничего: t.parentNoChangeMsg },
+        ));
       } catch (err) {
         onError(humanizeAdminError(err, locale));
       }
@@ -242,14 +295,10 @@ export function ParentsView({
   const t = d.adminParents;
 
   const [search, setSearch] = useState("");
-  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  const { flash, flashMsg } = useFlash(8000);
   const [isPending, startTransition] = useTransition();
   const [modal, setModal] = useState<Modal>({ kind: "none" });
 
-  function flash(msg: string) {
-    setFlashMsg(msg);
-    setTimeout(() => setFlashMsg(null), 8000);
-  }
 
   // Форма родителя требует выбрать хотя бы одного ребёнка из списка
   // учеников школы. Пока учеников нет, создавать некого.
@@ -292,11 +341,7 @@ export function ParentsView({
         )}
       </div>
 
-      {flashMsg && (
-        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-          {flashMsg}
-        </div>
-      )}
+      <FlashBanner msg={flashMsg} />
 
       <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
         <div className="border-b border-gray-100 p-4">
@@ -405,7 +450,7 @@ export function ParentsView({
           parent={modal.parent}
           allStudents={allStudents}
           onClose={() => setModal({ kind: "none" })}
-          onSaved={() => { flash(t.parentSavedMsg); setModal({ kind: "none" }); }}
+          onSaved={(сообщение) => { flash(сообщение); setModal({ kind: "none" }); }}
           onError={(msg) => flash(msg)}
           locale={locale as Locale}
           t={t}

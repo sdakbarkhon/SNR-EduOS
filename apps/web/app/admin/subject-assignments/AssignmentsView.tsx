@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition } from "react";
 import { Layers, Plus, Pencil, Trash2, X, Check, Loader2, Info, ListChecks, AlertTriangle } from "lucide-react";
-import { getDictionary, format } from "@snr/core";
+import { getDictionary, format, сообщениеОПеременах } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
@@ -20,6 +20,7 @@ import {
 } from "../actions";
 import type { BulkAssignPlan, BulkAssignResult } from "@/lib/admin-api";
 import { ModalPortal } from "@/components/ModalPortal";
+import { useFlash, FlashBanner } from "@/components/admin/Flash";
 
 // Z.2.2 — «кто что где ведёт». Одна строка = один предмет в одной группе с
 // одним учителем.
@@ -109,6 +110,17 @@ export function AssignmentsView({
     defaultOpenAdd && !missingBasics ? { mode: "add" } : { mode: "none" },
   );
   const [isPending, startTransition] = useTransition();
+  /*
+   * ЭКРАН БОЛЬШЕ НЕ МОЛЧИТ. Пункт 212, 06.09.2026.
+   *
+   * Создание, правка и удаление назначения не показывали НИЧЕГО: модалка
+   * закрывалась, страница перерисовывалась, и человек оставался гадать,
+   * сработало ли. Это хуже неточной фразы.
+   *
+   * Плашка та же, что у учителей и учеников, — общий хук, а не девятая
+   * ручная копия (components/admin/Flash.tsx).
+   */
+  const { flash, flashMsg } = useFlash();
 
   // Filters
   const [fGroup, setFGroup] = useState("");
@@ -171,11 +183,47 @@ export function AssignmentsView({
         fd.set("catalog_id", catalogId);
         fd.set("group_id", formGroupId);
         fd.set("teacher_id", formTeacherId);
+
+        // Имена для сообщения — из тех же списков, что рисуют экран. Их
+        // достаточно: назначение состоит ровно из предмета, группы и учителя,
+        // и все трое здесь под рукой.
+        const предметСтал = creatingNew
+          ? formNewName.trim()
+          : catalog.find((c) => c.id === catalogId)?.name ?? "—";
+        const группаСтала = groups.find((g) => g.id === formGroupId)?.name ?? "—";
+        const учительСтал = teachers.find((t) => t.id === formTeacherId)?.full_name ?? null;
+
         if (modal.mode === "edit") {
-          fd.set("id", modal.row.id);
+          const было = modal.row;
+          fd.set("id", было.id);
           await unwrap(actionUpdateSubjectAssignment(сШколой(fd)));
+          /*
+           * ЧТО ИМЕННО ПОМЕНЯЛИ — по правилу из @snr/core. Форма правит три
+           * вещи, и все три весомые: у предмета и группы меняется, к чему
+           * привязаны уроки, у учителя — кто вообще видит эту пару. Мелочей,
+           * которые стоило бы свернуть в «поправлено», здесь нет вовсе.
+           */
+          const весомые: string[] = [];
+          const предметБыл = было.name;
+          const группаБыла = было.group?.name ?? "—";
+
+          if (предметСтал !== предметБыл) {
+            весомые.push(format(d.assignmentSubjectChangedMsg, { from: предметБыл, to: предметСтал }));
+          }
+          if (группаСтала !== группаБыла) {
+            весомые.push(format(d.assignmentGroupChangedMsg, { from: группаБыла, to: группаСтала }));
+          }
+          if ((было.teacher_id ?? "") !== formTeacherId) {
+            весомые.push(учительСтал
+              ? format(d.assignmentTeacherSetMsg, { subject: предметСтал, group: группаСтала, teacher: учительСтал })
+              : format(d.assignmentTeacherClearedMsg, { subject: предметСтал, group: группаСтала }));
+          }
+          flash(сообщениеОПеременах({ весомые, сведения: [] }, { ничего: d.assignmentNoChangeMsg }));
         } else {
           await unwrap(actionCreateSubjectAssignment(сШколой(fd)));
+          flash(учительСтал
+            ? format(d.assignmentCreatedMsg, { subject: предметСтал, group: группаСтала, teacher: учительСтал })
+            : format(d.assignmentCreatedNoTeacherMsg, { subject: предметСтал, group: группаСтала }));
         }
         setModal({ mode: "none" });
       } catch (e) {
@@ -186,10 +234,16 @@ export function AssignmentsView({
 
   function handleDelete() {
     if (modal.mode !== "delete") return;
-    const id = modal.row.id;
+    const строка = modal.row;
     startTransition(async () => {
       try {
-        await unwrap(actionDeleteSubjectAssignment(id, schoolId));
+        await unwrap(actionDeleteSubjectAssignment(строка.id, schoolId));
+        // Строка сейчас исчезнет из таблицы — назвать её надо ДО того, как
+        // человек перестанет её видеть.
+        flash(format(d.assignmentDeletedMsg, {
+          subject: строка.name,
+          group: строка.group?.name ?? "—",
+        }));
         setModal({ mode: "none" });
       } catch (e) {
         alert(humanizeAdminError(e, locale as Locale));
@@ -327,6 +381,8 @@ export function AssignmentsView({
           </button>
         </div>
       </div>
+
+      <FlashBanner msg={flashMsg} />
 
       {/* Filters */}
       <div className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:grid-cols-3">

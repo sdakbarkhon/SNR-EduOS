@@ -7,6 +7,7 @@ import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
 import { actionChangeOwnPassword, actionSetOwnGoogleEmail } from "../actions";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
+import { useFlash, FlashBanner } from "@/components/admin/Flash";
 
 export function SettingsView({ googleEmail }: { googleEmail?: string | null }) {
   const { locale } = useLocale();
@@ -14,12 +15,8 @@ export function SettingsView({ googleEmail }: { googleEmail?: string | null }) {
   const t = d.superadmin;
 
   const [isPending, startTransition] = useTransition();
-  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  const { flash, flashMsg } = useFlash();
 
-  function flash(msg: string) {
-    setFlashMsg(msg);
-    setTimeout(() => setFlashMsg(null), 5000);
-  }
 
   return (
     <div className="space-y-6">
@@ -28,11 +25,7 @@ export function SettingsView({ googleEmail }: { googleEmail?: string | null }) {
         <p className="mt-1 text-sm text-gray-500">{t.settingsSubtitle}</p>
       </div>
 
-      {flashMsg && (
-        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-          {flashMsg}
-        </div>
-      )}
+      <FlashBanner msg={flashMsg} />
 
       {/* Почта для входа через Google — себе. Ролей выше суперадминистратора
           нет, просить кого-то вписать ему адрес некого, поэтому единственное

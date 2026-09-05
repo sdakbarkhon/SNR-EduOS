@@ -9,6 +9,7 @@ import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { origName } from "@/lib/form-patch";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
+import { useFlash, FlashBanner } from "@/components/admin/Flash";
 import {
   actionCreateSchoolAdmin, actionUpdateSchoolAdmin,
   actionDeleteSchoolAdmin, actionResetSchoolAdminPassword,
@@ -111,14 +112,10 @@ export function AdminsView({
 
   const [modal, setModal] = useState<Modal>(defaultOpenAdd ? { kind: "add" } : { kind: "none" });
   const [search, setSearch] = useState("");
-  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  const { flash, flashMsg } = useFlash(8000);
   const [isPending, startTransition] = useTransition();
   const [pwd, setPwd] = useState(() => generatePassword());
 
-  function flash(msg: string) {
-    setFlashMsg(msg);
-    setTimeout(() => setFlashMsg(null), 8000);
-  }
 
   const schoolName = (id: string) => schools.find((s) => s.id === id)?.name ?? "—";
 
@@ -140,11 +137,7 @@ export function AdminsView({
         </button>
       </div>
 
-      {flashMsg && (
-        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-          {flashMsg}
-        </div>
-      )}
+      <FlashBanner msg={flashMsg} />
 
       <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
         <div className="border-b border-gray-100 p-4">

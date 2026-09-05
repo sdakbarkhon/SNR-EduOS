@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw, Wallet } from "lucide-react";
-import { getDictionary, type Locale } from "@snr/core";
+import { getDictionary, format, сообщениеОПеременах, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { origName } from "@/lib/form-patch";
@@ -12,6 +12,7 @@ import { formatCoursePriceInput, formatSum } from "@/lib/course-price";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
+import { useFlash, FlashBanner } from "@/components/admin/Flash";
 import {
   actionCreateStudent,
   actionUpdateStudent,
@@ -226,15 +227,11 @@ export function StudentsView({
 
   const [modal, setModal] = useState<Modal | null>(defaultOpenAdd ? { kind: "add" } : null);
   const [search, setSearch] = useState("");
-  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  const { flash, flashMsg } = useFlash();
   const [isPending, startTransition] = useTransition();
   // Z.2.9 — второй клик до перерисовки больше не создаёт вторую запись.
   const guard = useSubmitGuard();
 
-  function flash(msg: string) {
-    setFlashMsg(msg);
-    setTimeout(() => setFlashMsg(null), 5000);
-  }
 
   // Пустой список и «поиск ничего не нашёл» — разные вещи. Раньше оба
   // показывали «Ничего не найдено»: в новой школе это выглядело как поломка,
@@ -272,11 +269,7 @@ export function StudentsView({
         </button>
       </div>
 
-      {flashMsg && (
-        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-          {flashMsg}
-        </div>
-      )}
+      <FlashBanner msg={flashMsg} />
 
       <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
         <div className="border-b border-gray-100 p-4">
@@ -410,10 +403,81 @@ export function StudentsView({
             schoolId={schoolId}
             onClose={() => setModal(null)}
             onSubmit={async (fd) => {
+              /*
+               * «ДАННЫЕ УЧЕНИКА ОБНОВЛЕНЫ» ПРЯТАЛО ПЕРЕВОД. Пункт 213,
+               * 06.09.2026.
+               *
+               * Одна фраза стояла на всё, что умеет эта форма, — а умеет она
+               * не только имя. Смена группы за одно «Сохранить» выводит
+               * ученика из чата прежнего класса, снимает его личные чаты с
+               * учителями, которые его больше не ведут (миграция 271), и
+               * заводит новые с учителями новой группы. Админ об этом не
+               * узнавал ни слова.
+               *
+               * СРАВНИВАЕМ ТО, ЧТО ЧЕЛОВЕК ВИДЕЛ, С ТЕМ, ЧТО ОТПРАВИЛ. «Было»
+               * — снимок карточки, с которым открыли форму; «стало» — сама
+               * форма. Сообщение поэтому описывает ДЕЙСТВИЕ АДМИНА, а не
+               * повторное чтение базы: серверное действие ничего не
+               * возвращает, а спрашивать базу заново ради фразы — лишний
+               * поход. Если ту же карточку одновременно правил кто-то другой,
+               * сообщение расскажет про своё действие, и это честно.
+               *
+               * ПРО ЧАТЫ ГОВОРИМ ТО, ЧТО ЕСТЬ. Уходит только участие: ветки и
+               * переписка остаются и возвращаются вместе с группой. «Чат
+               * удалён» было бы неправдой.
+               */
+              const было = modal.student;
+              const группаБыла = было.student_groups[0]?.groups?.id ?? "";
+              const имяГруппыБыло = было.student_groups[0]?.groups?.name ?? "";
+              const группаСтала = String(fd.get("group_id") ?? "");
+              const имяГруппыСтало = groups.find((g) => g.id === группаСтала)?.name ?? "";
+
+              const весомые: string[] = [];
+              if (группаБыла !== группаСтала) {
+                if (группаБыла && группаСтала) {
+                  весомые.push(format(t.studentMovedMsg, { from: имяГруппыБыло, to: имяГруппыСтало }));
+                } else if (группаСтала) {
+                  весомые.push(format(t.studentEnrolledMsg, { to: имяГруппыСтало }));
+                } else {
+                  весомые.push(format(t.studentUnenrolledMsg, { from: имяГруппыБыло }));
+                }
+              }
+
+              /*
+               * СВЕДЕНИЯ — ВСЕ ДЕВЯТЬ ПОЛЕЙ, А НЕ ТРИ.
+               *
+               * Сравниваем ЗНАЧЕНИЯ, а не факт отправки: форма шлёт все поля
+               * всегда, и «поле пришло» ничего не значит. Но и брать только
+               * имя с логином нельзя: карточка правит ещё дату рождения,
+               * пол, телефон, номер дела, аллергии и заметки врача — и всё
+               * это сервер пишет безусловно. Пропусти их — и админ, вписавший
+               * аллергию, получит «Изменений не было» на успешно сохранённой
+               * правке. Это хуже прежней неточной фразы: она отрицала бы
+               * сделанное.
+               *
+               * Медкарта приходит вложением и в двух видах сразу — разбирает
+               * её medicalOf, тот же, что заполняет форму.
+               */
+              const было_мед = medicalOf(было);
+              const поле = (имя: string) => String(fd.get(имя) ?? "").trim();
+              const сведения: string[] = [];
+              if (поле("full_name") !== было.full_name) сведения.push(t.detailName);
+              if (поле("username") !== было.username) сведения.push(t.detailUsername);
+              if (поле("google_email") !== (было.google_email ?? "")) сведения.push(t.detailEmail);
+              if (поле("birth_date") !== (было.birth_date ?? "")) сведения.push(t.detailBirthDate);
+              if (поле("gender") !== (было.gender ?? "")) сведения.push(t.detailGender);
+              if (поле("phone") !== (было.phone ?? "")) сведения.push(t.detailPhone);
+              if (поле("file_no") !== (было.file_no ?? "")) сведения.push(t.detailFileNo);
+              if (поле("allergies") !== было_мед.allergies) сведения.push(t.detailAllergies);
+              if (поле("medical_notes") !== было_мед.medical_notes) сведения.push(t.detailMedical);
+
               startTransition(async () => {
                 try {
                   await unwrap(actionUpdateStudent(сШколой(fd)));
-                  flash(t.studentUpdatedMsg);
+                  flash(сообщениеОПеременах(
+                    { весомые, сведения },
+                    { сведения: t.studentDetailsMsg, ничего: t.studentNoChangeMsg },
+                  ));
                   setModal(null);
                 } catch (e) {
                   flash(humanizeAdminError(e, locale as Locale));

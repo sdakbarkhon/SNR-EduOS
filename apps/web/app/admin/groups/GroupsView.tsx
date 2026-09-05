@@ -21,6 +21,7 @@ import {
 import { formatCoursePrice, formatCoursePriceInput } from "@/lib/course-price";
 import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup, actionCreateGroupsBulk } from "../actions";
 import type { BulkGroupsResult } from "@/lib/admin-api";
+import { useFlash, FlashBanner } from "@/components/admin/Flash";
 
 export type CatalogItem = { id: string; name: string; is_active: boolean };
 type Group = {
@@ -275,7 +276,7 @@ export function GroupsView({
     defaultOpenAdd && !noSubjects ? { kind: "add" } : null,
   );
   const [search, setSearch] = useState("");
-  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  const { flash, flashMsg } = useFlash();
   const [isPending, startTransition] = useTransition();
   // Z.2.9 — второй клик до перерисовки больше не создаёт вторую запись.
   const guard = useSubmitGuard();
@@ -356,10 +357,6 @@ export function GroupsView({
     });
   }
 
-  function flash(msg: string) {
-    setFlashMsg(msg);
-    setTimeout(() => setFlashMsg(null), 5000);
-  }
 
   const emptyText = search.trim()
     ? t.noResults
@@ -397,11 +394,7 @@ export function GroupsView({
         </button>
       </div>
 
-      {flashMsg && (
-        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-          {flashMsg}
-        </div>
-      )}
+      <FlashBanner msg={flashMsg} />
 
       <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
         <div className="border-b border-gray-100 p-4">

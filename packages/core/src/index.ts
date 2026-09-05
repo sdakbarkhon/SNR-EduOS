@@ -26,4 +26,5 @@ export * from "./utils/groupName";
 export * from "./utils/reviewQueue";
 export * from "./utils/errorText";
 export * from "./utils/groupNames";
+export * from "./utils/changeMessage";
 export * from "./mocks/payments";

@@ -17,6 +17,7 @@ import {
 } from "../actions";
 import { SchoolCardForm } from "./SchoolCardForm";
 import type { SchoolWipePreview } from "@/lib/school-lifecycle";
+import { useFlash, FlashBanner } from "@/components/admin/Flash";
 
 type School = {
   id: string; name: string; code: string | null;
@@ -92,7 +93,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
   /** Отказ, замеченный формой до отправки (негодный файл). Показывается там же,
    *  где и отказы сервера. */
   const [formError, setFormError] = useState<string | null>(null);
-  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  const { flash, flashMsg } = useFlash(6000);
   const [isPending, startTransition] = useTransition();
 
   // Диалог «убрать школу»: сначала выбор между архивом и удалением, и только
@@ -134,10 +135,6 @@ export function SchoolsView({ schools }: { schools: School[] }) {
     setConfirmText("");
   }
 
-  function flash(msg: string) {
-    setFlashMsg(msg);
-    setTimeout(() => setFlashMsg(null), 6000);
-  }
 
   return (
     <div className="space-y-6">
@@ -155,11 +152,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
         </button>
       </div>
 
-      {flashMsg && (
-        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-          {flashMsg}
-        </div>
-      )}
+      <FlashBanner msg={flashMsg} />
 
       <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
         <div className="overflow-x-auto">

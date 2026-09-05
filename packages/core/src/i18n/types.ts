@@ -717,6 +717,16 @@ export interface Dictionary {
     assignmentsBulkDone: string;
     assignmentsBulkFailedTitle: string;
     assignmentsBulkFailedRow: string;
+    // Пункт 212 — назначения перестали молчать. Правило сборки общее:
+    // packages/core/src/utils/changeMessage.ts.
+    assignmentCreatedMsg: string;
+    assignmentCreatedNoTeacherMsg: string;
+    assignmentTeacherSetMsg: string;
+    assignmentTeacherClearedMsg: string;
+    assignmentSubjectChangedMsg: string;
+    assignmentGroupChangedMsg: string;
+    assignmentDeletedMsg: string;
+    assignmentNoChangeMsg: string;
     role: string;
     profileSchool: string;
     // dashboard
@@ -927,7 +937,21 @@ export interface Dictionary {
     noSubjectWarning: string;
     assignedCountMsg: string;
     assignFailedMsg: string;
-    studentUpdatedMsg: string;
+    // Пункт 213 — «Данные ученика обновлены» прятало перевод и снятие.
+    studentMovedMsg: string;
+    studentEnrolledMsg: string;
+    studentUnenrolledMsg: string;
+    studentDetailsMsg: string;
+    studentNoChangeMsg: string;
+    detailName: string;
+    detailUsername: string;
+    detailEmail: string;
+    detailBirthDate: string;
+    detailGender: string;
+    detailPhone: string;
+    detailFileNo: string;
+    detailAllergies: string;
+    detailMedical: string;
     dashboardTitle: string;
     dashboardSubtitle: string;
     recentStudentsTitle: string;
@@ -1464,7 +1488,16 @@ export interface Dictionary {
     resetPasswordBtn: string;
     resetPasswordConfirm: string;
     resetPasswordNotRegistered: string;
-    parentSavedMsg: string;
+    // Пункт 214 — «Данные родителя сохранены» прятало смену детей.
+    parentChildAddedMsg: string;
+    parentChildRemovedMsg: string;
+    parentChildrenAddedMsg: string;
+    parentChildrenRemovedMsg: string;
+    parentDetailsMsg: string;
+    parentNoChangeMsg: string;
+    parentDetailName: string;
+    parentDetailPhone: string;
+    parentDetailEmail: string;
     parentDeletedMsg: string;
     newPasswordFlash: string;
     emptyParentsNeedStudents: string;

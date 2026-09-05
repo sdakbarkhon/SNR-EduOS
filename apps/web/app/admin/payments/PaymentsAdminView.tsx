@@ -28,6 +28,7 @@ import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
 import { formatCoursePriceInput, formatSum } from "@/lib/course-price";
 import type { InvoiceBlockerRow, SchoolInvoiceRow } from "@/lib/admin-payments";
+import { useFlash, FlashBanner } from "@/components/admin/Flash";
 import {
   actionAdjustInvoice,
   actionCancelInvoice,
@@ -152,14 +153,10 @@ export function PaymentsAdminView({
   const t = d.admin;
 
   const [modal, setModal] = useState<Modal>({ kind: "none" });
-  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  const { flash, flashMsg } = useFlash(6000);
   const [amount, setAmount] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  function flash(msg: string) {
-    setFlashMsg(msg);
-    setTimeout(() => setFlashMsg(null), 6000);
-  }
   const fail = (e: unknown) => flash(humanizeAdminError(e, locale as Locale));
 
   const reasonLabel: Record<InvoiceBlockerRow["reason"], string> = {
@@ -213,11 +210,7 @@ export function PaymentsAdminView({
         </div>
       )}
 
-      {flashMsg && (
-        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-          {flashMsg}
-        </div>
-      )}
+      <FlashBanner msg={flashMsg} />
 
       {/* ── Счета школы ──────────────────────────────────────────────────── */}
       <section className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
