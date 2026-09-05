@@ -2201,8 +2201,8 @@ export const en: Dictionary = {
     tipTitle: "Tip of the day",
     tipBody: "Ask questions one part at a time — it's easier to work through a hard topic step by step.",
     usageLimitLabel: "Requests left: {remaining} of {limit}",
-    usageBlocked: "You have used all requests. They come back at {time}",
-    usageLimitReached: "The daily assistant limit is used up — ten per student a day, shared between the lesson chat and this button. Come back tomorrow.",
+    usageBlocked: "You are out of questions. The next one frees up at {time}",
+    usageLimitReached: "You are out of questions: twenty per two hours, shared between the lesson chat and this button. No need to wait the full two hours — each question comes back two hours after itself, so the next one frees up soon.",
     suggestions: [
       "Help me solve an equation",
       "Translate a text into English",

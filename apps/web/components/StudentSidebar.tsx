@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, Trophy, CircleDot, MessageCircle, type LucideIcon } from "lucide-react";
-import { getDictionary, getHomework, getMySubmissions, getUnreadThreadCount } from "@snr/core";
+import { getDictionary, getHomework, getMySubmissions, getMyTestSubmissions, getUnreadThreadCount, несданныеЗадания } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -103,10 +103,13 @@ export function StudentSidebar({ isDemo }: { isDemo?: boolean } = {}) {
 
   useEffect(() => {
     const db = createClient();
-    Promise.all([getHomework(db), getMySubmissions(db)])
-      .then(([homework, submissions]) => {
-        const submittedIds = new Set(submissions.map((s) => s.homework_id));
-        setHomeworkCount(homework.filter((h) => !submittedIds.has(h.id)).length);
+    // ОДНО ПРАВИЛО «СДАНО» НА ВСЕ ЭКРАНЫ (06.09.2026). Здесь считались только
+    // сдачи из homework_submissions, а тесты уходят в test_submissions — и
+    // значок висел над задачами, которые ученик давно сдал и за которые получил
+    // оценку. По замеру: 151 вместо 30 на школу, задеты все 31.
+    Promise.all([getHomework(db), getMySubmissions(db), getMyTestSubmissions(db)])
+      .then(([homework, submissions, testSubmissions]) => {
+        setHomeworkCount(несданныеЗадания(homework, submissions, testSubmissions).length);
       })
       .catch((e) => console.error("[StudentSidebar] homework badge count failed:", e?.message ?? e));
 

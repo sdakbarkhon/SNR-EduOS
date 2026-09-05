@@ -2201,8 +2201,8 @@ export const uz: Dictionary = {
     tipTitle: "Kunning maslahati",
     tipBody: "Savollarni qismlarga bo'lib ber — murakkab mavzuni qadam-baqadam tushunish osonroq.",
     usageLimitLabel: "Qolgan so‘rovlar: {remaining} / {limit}",
-    usageBlocked: "So‘rovlar tugadi. Yana {time} da ochiladi",
-    usageLimitReached: "Yordamchiga kunlik so'rovlar limiti tugadi — kuniga o'quvchiga o'nta, dars va shu tugma uchun umumiy. Ertaga qaytib keling.",
+    usageBlocked: "Savollar tugadi. Keyingisi {time} da bo‘shaydi",
+    usageLimitReached: "Savollar tugadi: ikki soatga yigirmata, dars va shu tugma uchun umumiy. Ikki soat kutish shart emas — har bir savol o‘zidan ikki soat keyin qaytadi, shuning uchun keyingisi tez orada bo‘shaydi.",
     suggestions: [
       "Tenglamani yechishga yordam ber",
       "Matnni ingliz tiliga tarjima qil",

@@ -26,6 +26,10 @@ import {
   tashkentDayKey,
   tashkentDayOfYear,
   subjectFilterKey,
+  сданныеЗадания,
+  несданныеЗадания,
+  видУрокаНаЭкране,
+  ПРИГЛУШЕНИЕ_ПРОШЕДШЕГО,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -160,8 +164,11 @@ export function DashboardView({
     window.open(`https://www.google.com/search?q=${encodeURIComponent(aiFactText)}`, "_blank", "noopener,noreferrer");
   }
 
-  const submittedIds = new Set(submissions.map((s) => s.homework_id));
-  const activeHomeworkCount = homework.filter((h) => !submittedIds.has(h.id)).length;
+  // ОДНО ПРАВИЛО «СДАНО» (06.09.2026). Здесь считались только сдачи ДЗ, а
+  // тесты уходят в test_submissions — плитка и значок в меню показывали
+  // несделанным то, что сдано и оценено. Пончик ниже уже считал по обеим
+  // таблицам, и два числа об одном расходились.
+  const activeHomeworkCount = несданныеЗадания(homework, submissions, testSubmissions).length;
   const firstName = student.full_name.split(" ")[0] ?? student.full_name;
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   // Модалка предмета (ЧАСТЬ 1в) — грузится по клику, а не заранее вместе с
@@ -218,10 +225,8 @@ export function DashboardView({
   // test_submissions (сдано). Внешние сервисы попадают в "выдано", никогда в
   // "сдано" — 100% недостижимо, это по дизайну.
   const homeworkById = new Map(homework.map((h) => [h.id, h]));
-  const submittedHomeworkIds = new Set<string>([
-    ...submissions.map((s) => s.homework_id),
-    ...testSubmissions.map((ts) => ts.homework_id),
-  ]);
+  // Тот же общий свод, что у плитки и у значка: правило одно.
+  const submittedHomeworkIds = сданныеЗадания(submissions, testSubmissions);
   const totalAssignedCount = homework.length;
   const totalSubmittedCount = homework.filter((h) => submittedHomeworkIds.has(h.id)).length;
   const overallPercent = totalAssignedCount > 0 ? Math.round((totalSubmittedCount / totalAssignedCount) * 100) : 0;
@@ -608,20 +613,21 @@ export function DashboardView({
                 const sub = lesson.subject_id ? subjectById.get(lesson.subject_id) : undefined;
                 const SubIcon = sub ? (LUCIDE_ICONS[sub.icon] ?? BookOpen) : BookOpen;
                 const end = lesson.ends_at ? new Date(lesson.ends_at) : null;
-                const isNow = currentLessonIdToday === lesson.id;
-                // Безусловно — как на /lessons (LessonsView.tsx): раньше тут
-                // был доп. 15-минутный порог, из-за которого "Далее" почти
-                // никогда не появлялось (баг: на /lessons метка видна, на
-                // дашборде — нет для того же урока в тот же момент).
-                const isNext = !isNow && nextLessonToday?.id === lesson.id;
-                const isCompleted = lesson.status === "completed";
+                // Вид урока — общим правилом на все три экрана ученика
+                // (06.09.2026): главная, день и неделя решали порознь и
+                // разошлись. Порог «за сколько минут показывать Далее» здесь
+                // не нужен и не был нужен: метка видна там же, где на /lessons.
+                const вид = видУрокаНаЭкране(lesson, currentLessonIdToday, nextLessonToday?.id);
+                const isNow = вид === "идёт";
+                const isNext = вид === "следующий";
+                const isCompleted = вид === "прошёл";
                 const tileColor = sub?.color ?? "#94A3B8";
                 return (
                   <Link
                     key={lesson.id}
                     href={`/lessons/${lesson.id}`}
                     className="flex items-center gap-2.5 rounded-2xl p-2.5 transition hover:bg-[#F7F5FF]"
-                    style={{ background: isNow ? "#F4F0FF" : undefined, opacity: isCompleted ? 0.6 : 1 }}
+                    style={{ background: isNow ? "#F4F0FF" : undefined, opacity: isCompleted ? ПРИГЛУШЕНИЕ_ПРОШЕДШЕГО : 1 }}
                   >
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tileColor }} />
                     <div

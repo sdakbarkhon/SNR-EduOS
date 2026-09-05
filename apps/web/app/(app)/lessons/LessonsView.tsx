@@ -15,7 +15,7 @@ import {
   Smile,
   Star,
 } from "lucide-react";
-import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek, tashkentDayKey, tashkentTimeHm, DEFAULT_LESSON_DURATION_MINUTES } from "@snr/core";
+import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek, tashkentDayKey, tashkentTimeHm, DEFAULT_LESSON_DURATION_MINUTES, видУрокаНаЭкране, ПРИГЛУШЕНИЕ_ПРОШЕДШЕГО } from "@snr/core";
 import type { LessonWithSubject, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -328,17 +328,20 @@ export function LessonsView({
             <div className="mt-3 flex flex-wrap items-stretch gap-4 pb-2">
               {todayLessons.map((l) => {
                 const color = lessonColor(l);
-                const isNow = l.id === currentId;
-                // Прошедшие уроки — нейтральный вид (без спец-метки, без
-                // приглушения), поэтому isPast больше нигде не нужен для
-                // стилизации ниже (замирание последнего урока дня на
-                // "Сейчас" реализовано выше, через currentId).
-                const isNext = !isNow && l.id === nextLesson?.id;
+                // 06.09.2026 — ЗАКОНЧЕННЫЙ УРОК ОТЛИЧАЕТСЯ. Здесь стояло
+                // «прошедшие уроки — нейтральный вид, без приглушения», и на
+                // главной он при этом гас: один ребёнок, два разных списка.
+                // Решение общее и лежит в одном месте.
+                const вид = видУрокаНаЭкране(l, currentId, nextLesson?.id);
+                const isNow = вид === "идёт";
+                const isNext = вид === "следующий";
+                const прошёл = вид === "прошёл";
                 return (
                   <button
                     key={l.id}
                     onClick={() => router.push(`/lessons/${l.id}`)}
                     className="group w-56 shrink-0 text-left lg:w-60"
+                    style={{ opacity: прошёл ? ПРИГЛУШЕНИЕ_ПРОШЕДШЕГО : 1 }}
                   >
                     <div className="mb-1.5 px-1">
                       <span className="text-sm font-extrabold text-slate-700">{timeLabel(l)}</span>
@@ -427,6 +430,8 @@ export function LessonsView({
           locale={locale}
           s={s}
           roomLabel={d.dashboard.room}
+          currentId={currentId}
+          nextId={nextLesson?.id ?? null}
           onPrev={() => goWeek(-1)}
           onNext={() => goWeek(1)}
           onOpen={(id) => router.push(`/lessons/${id}`)}
@@ -510,11 +515,15 @@ function WeekDayList({
 // ── Сетка недели ──────────────────────────────────────────────────────────────
 
 function WeekGrid({
-  weekStart, lessons, today, loading, locale, s, roomLabel, onPrev, onNext, onOpen,
+  weekStart, lessons, today, loading, locale, s, roomLabel, currentId, nextId, onPrev, onNext, onOpen,
 }: {
   weekStart: string;
   lessons: LessonWithSubject[];
   today: string;
+  /** Идущий и следующий урок СЕГОДНЯ — считает родитель, чтобы неделя и день
+   *  не расходились в том, какой урок «сейчас». */
+  currentId: string | null;
+  nextId: string | null;
   loading: boolean;
   locale: string;
   s: ReturnType<typeof getDictionary>["schedule"];
@@ -662,14 +671,19 @@ function WeekGrid({
                     className="relative z-[1] flex min-w-0 flex-col justify-center gap-1"
                     style={{ gridColumn: di + 2, gridRow: ti + 1 }}
                   >
-                    {cellLessons.map((l) => (
+                    {cellLessons.map((l) => {
+                      const вид = видУрокаНаЭкране(l, currentId, nextId);
+                      return (
                       <button
                         key={l.id}
                         onClick={() => onOpen(l.id)}
                         className={cn(
                           "flex w-full min-w-0 items-center gap-2 rounded-xl border bg-white p-2 text-left shadow-sm transition hover:shadow-md",
-                          di === todayIdx ? "border-violet-100" : "border-slate-100",
+                          вид === "идёт" ? "border-violet-300 shadow-[0_6px_16px_rgba(124,92,252,0.18)]"
+                            : вид === "следующий" ? "border-orange-300"
+                            : di === todayIdx ? "border-violet-100" : "border-slate-100",
                         )}
+                        style={{ opacity: вид === "прошёл" ? ПРИГЛУШЕНИЕ_ПРОШЕДШЕГО : 1 }}
                       >
                         <ClayIcon icon={l.subject?.icon} color={lessonColor(l)} size="sm" />
                         <div className="min-w-0">
@@ -681,7 +695,8 @@ function WeekGrid({
                           )}
                         </div>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               }),
