@@ -19085,3 +19085,176 @@ EXECUTE в момент `CREATE TRIGGER`, а не при срабатывани�
 Кода не трогали, миграций не заводили, данных не касались. Все пробы — в
 транзакции с откатом на одноразовых таблицах, после отката проверено, что
 следов не осталось.
+
+
+---
+
+## 06.09.2026 — Пункт 33, разведка №2: функции, открытые анониму. Только замер
+
+**Задача.** Понять точный размер дыры «функции открыты роли `anon`» и собрать
+список на отзыв. Ни одной правки схемы, ни одного файла миграции. Пишущие
+функции не звать ни при каких условиях — в первую очередь денежные.
+
+### Числа
+
+Наших функций в `public` — **141** (ещё 114 принадлежат расширению `vector`,
+их не считаем). Анониму открыты **94**:
+
+| | Штук |
+|---|---|
+| Триггерных (PostgREST снаружи не пускает) | 49 |
+| **Вызываемых** | **45** |
+| из них SECURITY DEFINER | 39 |
+| из них пишут (по телу или через вложенный вызов) | 9 |
+
+Прошлая цифра «11 пишущих» была по признаку VOLATILE и завышена: разбор тел
+даёт **10** для SECURITY DEFINER (8 прямых + 2 через вложенный вызов) и **9**
+для всех вызываемых, открытых анониму. `get_ai_usage_today` помечена VOLATILE,
+но только читает.
+
+**Право получено молча.** Явный `GRANT ... TO anon` в миграциях есть только
+у **4 из 69** SECURITY DEFINER (`release_demo_slot`,
+`get_occupied_teacher_subjects`, `heartbeat_demo_slot`, `get_ai_usage_today`).
+Остальные **65** получили право из `ALTER DEFAULT PRIVILEGES` — никто их
+анониму не открывал, они открылись сами. Проверял разбором всех 267 файлов
+миграций на `GRANT EXECUTE ON FUNCTION ... TO ... anon`.
+
+### Аноним доходит до /rpc/ и исполняет — доказано
+
+Публичным ключом из окружения, без всякой сессии:
+
+```
+POST /rest/v1/rpc/zzz_no_such_function_33  ->  HTTP 404  PGRST202
+     (маршрутизатор дошёл, функции просто нет — это не 401 и не 403)
+
+POST /rest/v1/rpc/get_current_user_role    ->  HTTP 200  null
+     (функция ИСПОЛНИЛАСЬ; null потому, что сессии нет)
+
+POST /rest/v1/rpc/fn_storage_rel
+     {"p_name":"<school>/teachers/x.png"} ->  HTTP 200  "teachers/x.png"
+     (функция с аргументом исполнилась и вернула настоящий ответ)
+```
+
+Преграды между публичным ключом и `/rpc/` нет никакой. У роли `anon` в
+настройках только `statement_timeout=3s`. Схема `public` выставлена наружу —
+это и доказано успешными вызовами. Описание API (`Accept: application/openapi+json`)
+анониму закрыто, HTTP 401, но на исполнение это не влияет.
+
+Пишущие не звал. `fn_lesson_materials_to_kb` проверена безопасно: у неё
+аргумент **без умолчания**, вызов с `{}` исполниться не может — PostgREST
+ответил PGRST202 «without parameters».
+
+### Можно ли снаружи без входа тронуть деньги — ДА, механизм открыт
+
+`fn_issue_monthly_invoices(p_school_id uuid DEFAULT NULL)` и
+`fn_settle_open_invoices(p_school_id uuid DEFAULT NULL)`.
+
+Прочитал тела целиком. В обеих:
+
+* `SECURITY DEFINER` — исполняются правами владельца, правила доступа обходят;
+* **ни одной проверки личности**: ни `auth.uid()`, ни `current_school_id()`,
+  ни сверки роли. Ни строчки;
+* **аргумент по умолчанию NULL, а NULL означает ВСЕ ШКОЛЫ.** У первой цикл
+  `FOR r_school IN SELECT ... WHERE s.is_active AND (p_school_id IS NULL OR
+  s.id = p_school_id)`; у второй то же условие по счетам. То есть вызов вообще
+  без аргументов проходит по всем четырём школам;
+* первая вставляет строки в `tuition_invoices`, вторая пишет
+  `balance_entries` и переводит счета в `paid`.
+
+Проверил `pronargdefaults = 1` у обеих — значит вызов с пустым телом `{}`
+подходит под сигнатуру и **исполнился бы**. Именно поэтому не звал.
+
+Отката у HTTP-вызова нет. Сегодня ущерб ограничен тем, что у всех учеников
+баланс нулевой (`balance_entries` — 0 строк), и погашение упрётся в
+`CONTINUE WHEN v_balance < r.amount`. Выставление счетов ограничено ничем.
+
+### Что анониму нужно легально — НИ ОДНОЙ функции базы
+
+Разобраны все пути до входа: экран входа, вход по телефону родителя, вход
+через Google и `/auth/callback`, демо-вход, публичные маршруты, посредник.
+
+Каждый вызов функции на этих путях идёт **служебным ключом**
+(`createAdminClient`) либо **уже после выдачи сессии** (тогда роль
+`authenticated`). Анонимному ключу остаются только эндпоинты GoTrue
+(`signInWithPassword`, `verifyOtp`, `exchangeCodeForSession`,
+`signInWithOAuth`) — это не функции базы.
+
+Список школ на экране входа тоже читается служебным ключом
+(`lib/public-schools.ts`), потому что правила доступа анониму не отдают ничего.
+
+**Демо-вход — посылка подтверждена.** `claim_demo_slot` зовётся служебным
+ключом (`auth.ts:402 → :444`), право у `anon` и `authenticated` отозвано ещё
+миграцией 185. Сессию открывает `verifyOtp` на обычную учётную запись
+демо-школы — сразу после этого человек `authenticated`, а не `anon`.
+Демо-режим это обычный вход плюс баннер.
+
+Из браузера в базу уходит 22 разных вызова — и **ни одного до входа**.
+Браузерных клиентов Supabase два (`apps/web/lib/supabase/client.ts`,
+`apps/h5p/lib/supabase/client.ts`) плюс устройство (`apps/mobile-parent`).
+
+### Предложено к отзыву
+
+**Отозвать у `anon` — 45 вызываемых функций.** Ни одна анониму не нужна.
+Триггерные 49 не трогаем: PostgREST их не пускает, а Postgres проверяет
+EXECUTE в момент `CREATE TRIGGER`, а не при срабатывании.
+
+Разбивка по риску:
+
+*Денежные (2) — отозвать и у `authenticated`:*
+`fn_issue_monthly_invoices(uuid)`, `fn_settle_open_invoices(uuid)`.
+Зовутся только из `lib/admin-payments.ts` служебным ключом. Ломаться нечему.
+
+*Прочие пишущие (7):* `check_user_session(uuid)`, `touch_user_session()`,
+`increment_ai_usage()`, `release_demo_slot(text)`, `heartbeat_demo_slot(text)`,
+`fn_lesson_materials_to_kb(uuid)`, `fn_drop_direct_chat_participation(uuid,uuid)`.
+
+*Читающие, анониму не нужные (36):* остальные из списка 45 — предикаты
+`is_my_*`, `current_*_id`, `can_*`, `school_now`, `fn_storage_*`,
+`match_lesson_stage_embeddings`, `get_ai_usage_today`, `fn_issue_preview`
+и прочие.
+
+*Плюс три из корзины 2 прошлого захода:* `get_occupied_teacher_subjects()`,
+`touch_user_session()`, `is_manager()` — отозвать у обеих ролей, вызывающих
+нет нигде.
+
+### Отозвать и у `authenticated` — 11
+
+`fn_issue_monthly_invoices`, `fn_settle_open_invoices`, `fn_issue_preview`,
+`increment_ai_usage`, `get_ai_usage_today`, `match_lesson_stage_embeddings`,
+`release_demo_slot`, `heartbeat_demo_slot`, `get_occupied_teacher_subjects`,
+`touch_user_session`, `is_manager`.
+
+Все одиннадцать зовутся либо служебным ключом с сервера, либо не зовутся вовсе.
+Ни ученик, ни родитель, ни учитель их звать не должен.
+
+### Трогать нельзя — 9
+
+Проверено поимённо, у каждой названа причина:
+
+| Функция | Почему нельзя |
+|---|---|
+| `is_super_admin()` | Миграция 222 вешает с ней RESTRICTIVE-правило `TO public` на КАЖДУЮ пишущую таблицу |
+| `sa_write_allowed(text)` | То же правило; вдобавок единственная из помощников без SECURITY DEFINER |
+| `current_school_id()` | Стоит умолчанием на 60 колонках `school_id` — отзыв ломает вставку |
+| `fn_new_payment_public_no()` | Умолчание на `payment_intents.public_no`, без SECURITY DEFINER |
+| `fn_lesson_materials_to_kb(uuid)` | У `authenticated` оставить: зовётся из `fn_lesson_status_to_kb` — та **INVOKER**, права спрашиваются у учителя, завершающего урок |
+| `fn_drop_direct_chat_participation(uuid,uuid)` | У `authenticated` оставить: зовётся из `tg_subject_teacher_direct_chats_off` и `tg_student_group_direct_chats_off` — обе **INVOKER** (миграция 271) |
+| `fn_direct_chat_still_linked(uuid,uuid)` | Та же цепочка INVOKER |
+| `check_user_session(uuid)` | У `authenticated` оставить: посредник зовёт её ключом вошедшего |
+| `admin_name(announcements)` | Вычисляемое поле PostgREST, запрашивается из браузера в `PARENT_ANNOUNCEMENT_SELECT`. У `anon` уже закрыто миграцией 198 |
+
+Отдельная оговорка про предикаты правил доступа (`is_my_group`,
+`current_teacher_id` и прочие 24): у `anon` их отозвать можно и нужно, но надо
+понимать следствие — запрос анонима к таблице с таким правилом станет
+отвечать «нет права на функцию» вместо пустого списка. Для продукта разницы
+нет: аноним и сегодня не получает ни строки. У `authenticated` их трогать
+нельзя ни в коем случае.
+
+### Что осталось
+
+Миграции не заводил — это следующий заход и он ждёт слова. Открытые вопросы
+прежние: отзыв TRUNCATE у 78 таблиц и правка самих `ALTER DEFAULT PRIVILEGES`
+(разведка №1, коммит `76b3161f`).
+
+Кода не трогали, схему не меняли, данных не касались. Пишущих функций не
+вызывали ни разу — ни через SQL, ни через HTTP.
