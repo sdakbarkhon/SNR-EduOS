@@ -32,8 +32,8 @@ interface Props {
   materialUrls: Record<string, string>;
   studentId: string | null;
   linkedHomework: Array<{ id: string; title: string; content_type: ContentType; due_date: string | null }>;
-  /** schools.is_demo — только для прав на управление видео, см.
-   *  DemoMaterialContent.tsx. */
+  /** schools.is_demo — урок в демо-школе: видео, «Управление этапами»,
+   *  листание презентации у себя и выход из неё. См. LessonWorkspaceView.tsx. */
   isDemoSchool?: boolean;
 }
 

@@ -32,6 +32,7 @@ export function SlideViewer({
   initialSlide = 0,
   lessonStatus,
   viewerOnly = false,
+  isDemoSchool = false,
   chromeAbovePx,
   autoFullscreen = false,
   lockedUntilStageEnds = false,
@@ -49,12 +50,18 @@ export function SlideViewer({
   /** "in_progress": student gets the same live nav as the teacher, writes sync to everyone via Realtime. "completed": students browse freely for review — same as teacher nav, but never writes current_slide_index (that's live-lesson-only state). */
   lessonStatus?: string;
   /** Большой фикс, Блок 3 (правило 3-го урока) — true только для демо-школы,
-   *  студент на 3+ уроке дня: форсирует canNavigate/syncsWrite в false
-   *  независимо от lessonStatus — ученик только смотрит (realtime-подписка
-   *  на current_slide_index остаётся активной, так что слайд всё равно
-   *  синхронно следует за учителем/другими участниками). Никогда не
-   *  задаётся для isTeacher или для post-completion review. */
+   *  студент на 3+ уроке дня. С 11.09.2026 на листание НЕ влияет: в демо
+   *  ученик листает у себя на любом уроке (см. isDemoSchool). Остался только
+   *  в условии записи общего слайда (syncsWrite), где ничего не меняет —
+   *  ученик общий слайд не пишет. Никогда не задаётся для isTeacher или для
+   *  post-completion review. */
   viewerOnly?: boolean;
+  /** 11.09.2026 — урок в ДЕМО-ШКОЛЕ (schools.is_demo; приходит пропом с экрана
+   *  урока ученика: lessons/[id]/page.tsx → isDemoSchoolLesson). Демо — витрина:
+   *  ученик листает презентацию сам, у себя, на любом уроке. Общий слайд при
+   *  этом не пишет (syncsWrite требует isTeacher), подписка на слайд учителя
+   *  остаётся. Везде, кроме экрана урока ученика демо-школы, — false. */
+  isDemoSchool?: boolean;
   /** Сколько "остального" над этим SlideViewer в текущем макете (шапка
    *  урока в обычном режиме / почти ничего в фокус-режиме — см.
    *  LessonWorkspaceView.tsx PRESENTATION_CHROME_ABOVE_PX). Когда задан,
@@ -113,7 +120,10 @@ export function SlideViewer({
   //
   // Разбор ПОСЛЕ урока не тронут: там ученик листает свой же материал сам,
   // локально и никому ничего не транслируя.
-  const canNavigate = !viewerOnly && (isTeacher || lessonStatus === "completed");
+  // 11.09.2026 — исключение для демо-школы: там ученик листает сам, у себя, на
+  // любом уроке дня (правило «3-го урока» на листание больше не действует).
+  // Общий слайд он при этом не пишет — это решает syncsWrite ниже, и база (270).
+  const canNavigate = isTeacher || lessonStatus === "completed" || isDemoSchool;
   // Writes to the shared current_slide_index — ТОЛЬКО пока урок реально идёт,
   // одинаково для учителя и ученика.
   //
@@ -172,9 +182,10 @@ export function SlideViewer({
   // (этап кончился, урок завершён) сразу возвращает обычные Esc и кнопку.
   const заперт = isFull && lockedUntilStageEnds && !isTeacher;
 
-  // Keyboard navigation — teacher or post-completion student review.
+  // Keyboard navigation — teacher, post-completion student review и (с 11.09.2026)
+  // ученик демо-школы на идущем уроке — у себя, без записи.
   // 11.09.2026 — учитель на идущем уроке снова пишет слайд всему классу, поэтому:
-  // стрелки в поле ввода — это правка текста, а не листание; а пишущий
+  // стрелки в поле ввода или в видео — это не листание; а пишущий
   // просмотрщик слушает стрелки только во весь экран — под окном этапа и рядом
   // с полями страницы он не должен перелистывать классу слайд. Эффект стоит
   // ниже isFull: выше к нему обращаться нельзя.
@@ -183,7 +194,7 @@ export function SlideViewer({
     if (syncsWrite && stageId && !isFull) return;
     const handler = (e: KeyboardEvent) => {
       const цель = e.target as HTMLElement | null;
-      if (цель && (цель.isContentEditable || цель.tagName === "INPUT" || цель.tagName === "TEXTAREA" || цель.tagName === "SELECT")) return;
+      if (цель && (цель.isContentEditable || цель.tagName === "INPUT" || цель.tagName === "TEXTAREA" || цель.tagName === "SELECT" || цель.tagName === "VIDEO" || цель.tagName === "AUDIO")) return;
       if (e.key === "ArrowLeft") goTo(current - 1);
       if (e.key === "ArrowRight") goTo(current + 1);
     };

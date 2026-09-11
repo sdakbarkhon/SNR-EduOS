@@ -287,10 +287,11 @@ export function LessonWorkspaceView({
   lesson: StudentLessonView;
   materialUrls: Record<string, string>;
   studentId: string | null;
-  /** schools.is_demo — нужен только для прав на управление видео: ученик
-   *  демо-школы может ставить на паузу локально, ученик реальной школы
-   *  смотрит без контролов. Не путать с замороженным временем (isDemoMode)
-   *  и демо-СЕССИЕЙ (кука). См. DemoMaterialContent.tsx. */
+  /** schools.is_demo — урок в демо-школе. Решает: управление видео (ученик
+   *  демо-школы ставит на паузу локально, см. DemoMaterialContent.tsx),
+   *  «Управление этапами», и с 11.09.2026 — листание презентации у себя и
+   *  выход из неё (замок presentationLocked не ставится). Не путать с
+   *  замороженным временем (frozen_date) и демо-СЕССИЕЙ (кука). */
   isDemoSchool?: boolean;
 }) {
   // Единственное место, где AppShell прячет каркас (сайдбар/топбар/паддинги) —
@@ -804,22 +805,23 @@ export function LessonWorkspaceView({
     !isCompleted && !showCompletedModal && !demoMaterialId &&
     currentCenterStage?.stage_type === "theory" && !!currentCenterStage?.slides?.length;
 
-  // «Выход с усилием» у ученика — пока этап активен, короткий Esc не выводит,
-  // нужно удержать (см. SlideViewer.tsx, там же — почему не полный запрет).
+  // Замок презентации у ученика — пока этап активен, Esc не выводит и крестика
+  // нет (531aff15, 05.09.2026; до того был «выход с усилием» удержанием Esc).
   //
   // Условия узкие:
   //   • только живой урок: на завершённом ученик пересматривает слайды сам;
   //   • только пока опрос живого состояния отвечает (liveSyncOk) — иначе о
   //     конце этапа узнать нечем и держать ученика нельзя;
-  //   • «третий урок» (viewerOnly) не исключение: он смотрит ту же
-  //     презентацию синхронно с классом, просто не листает.
+  //   • не в демо-школе (11.09.2026): демо — витрина, ученик выходит из
+  //     презентации Esc и крестиком на любом уроке, «третий урок» тоже.
+  //     Урок демо звонком не закрывается — замок там не снимался бы никогда.
   //
   // Автоматический выход при этом держится НЕ на этом флаге, а на
   // размонтировании: centerStages = [activeMiddleStage], поэтому смена
   // активного этапа убирает презентацию из дерева вместе с порталом
   // независимо от любых флагов. Проп lesson.status ниже устаревший, но это
   // безвредно — завершение урока гасит саму isPresentationActive выше.
-  const presentationLocked = isPresentationActive && lesson.status === "in_progress" && liveSyncOk;
+  const presentationLocked = isPresentationActive && lesson.status === "in_progress" && liveSyncOk && !isDemoSchool;
 
   // Авто-сворачивание бокового меню при входе в активную презентацию —
   // больше места слайду. Ученик может развернуть меню вручную (toggle кнопка
@@ -1450,6 +1452,7 @@ export function LessonWorkspaceView({
                         onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
                         chromeAbovePx={PRESENTATION_CHROME_ABOVE_PX}
                         viewerOnly={lesson.isThirdLessonViewer}
+                        isDemoSchool={isDemoSchool}
                         locked={presentationLocked}
                         stageImageUrl={(stage as { image_url?: string | null }).image_url ?? null}
                       />
@@ -1464,6 +1467,7 @@ export function LessonWorkspaceView({
                           initialSlide={stage.current_slide_index ?? 0}
                           lessonStatus={lesson.status}
                           viewerOnly={lesson.isThirdLessonViewer}
+                          isDemoSchool={isDemoSchool}
                           stageImageUrl={(stage as { image_url?: string | null }).image_url ?? null}
                         />
                       </div>

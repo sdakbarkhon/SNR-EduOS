@@ -30,6 +30,7 @@ import { SlideViewer } from "./SlideViewer";
  */
 export function StudentPresentationViewer({
   slides, stageId, initialSlide, lessonStatus, onExportPptx, chromeAbovePx, viewerOnly = false,
+  isDemoSchool = false,
   locked = false,
   stageImageUrl,
 }: {
@@ -41,8 +42,11 @@ export function StudentPresentationViewer({
   chromeAbovePx: number;
   /** Большой фикс, Блок 3 — см. SlideViewer.tsx. */
   viewerOnly?: boolean;
-  /** Выход только удержанием Esc, пока этап активен (07.08.2026). Считает
-   *  родитель — см. LessonWorkspaceView.tsx, presentationLocked. */
+  /** 11.09.2026 — урок в демо-школе: ученик листает сам, у себя. См. SlideViewer.tsx. */
+  isDemoSchool?: boolean;
+  /** Замок презентации: пока этап активен, Esc не выводит и крестика нет
+   *  (531aff15; до того — удержание Esc). В демо-школе замка нет (11.09.2026).
+   *  Считает родитель — см. LessonWorkspaceView.tsx, presentationLocked. */
   locked?: boolean;
   /** 08.08.2026 — картинка этапа внутрь слайда, см. SlideBody. */
   stageImageUrl?: string | null;
@@ -62,6 +66,7 @@ export function StudentPresentationViewer({
         lessonStatus={lessonStatus}
         chromeAbovePx={chromeAbovePx}
         viewerOnly={viewerOnly}
+        isDemoSchool={isDemoSchool}
         // 07.08.2026 — презентация этапа открывается сразу во весь экран.
         // Это возврат к тому, что было до 06.08, но уже С ВЫХОДОМ: Esc и
         // кнопка закрытия в SlideViewer. Именно отсутствие выхода было
