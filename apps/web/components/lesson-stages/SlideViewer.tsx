@@ -156,17 +156,6 @@ export function SlideViewer({
     },
   );
 
-  // Keyboard navigation — teacher or post-completion student review.
-  useEffect(() => {
-    if (!canNavigate) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") goTo(current - 1);
-      if (e.key === "ArrowRight") goTo(current + 1);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [canNavigate, current, goTo]);
-
   // 07.08.2026 — полноэкранный показ. Живёт здесь, а не в обёртках, чтобы
   // учитель и ученик получили ровно один и тот же режим: обёртки у них разные
   // (StudentPresentationViewer / StageViewModal), а SlideViewer — общий.
@@ -182,6 +171,25 @@ export function SlideViewer({
   // Учителя не запираем никогда — флаг приходит пропом, и снятие блокировки
   // (этап кончился, урок завершён) сразу возвращает обычные Esc и кнопку.
   const заперт = isFull && lockedUntilStageEnds && !isTeacher;
+
+  // Keyboard navigation — teacher or post-completion student review.
+  // 11.09.2026 — учитель на идущем уроке снова пишет слайд всему классу, поэтому:
+  // стрелки в поле ввода — это правка текста, а не листание; а пишущий
+  // просмотрщик слушает стрелки только во весь экран — под окном этапа и рядом
+  // с полями страницы он не должен перелистывать классу слайд. Эффект стоит
+  // ниже isFull: выше к нему обращаться нельзя.
+  useEffect(() => {
+    if (!canNavigate) return;
+    if (syncsWrite && stageId && !isFull) return;
+    const handler = (e: KeyboardEvent) => {
+      const цель = e.target as HTMLElement | null;
+      if (цель && (цель.isContentEditable || цель.tagName === "INPUT" || цель.tagName === "TEXTAREA" || цель.tagName === "SELECT")) return;
+      if (e.key === "ArrowLeft") goTo(current - 1);
+      if (e.key === "ArrowRight") goTo(current + 1);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [canNavigate, syncsWrite, stageId, isFull, current, goTo]);
 
   useEffect(() => {
     if (!isFull) return;

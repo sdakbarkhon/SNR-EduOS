@@ -53,6 +53,18 @@ export type RealtimePayload = {
  *
  * ЭТО НЕ ЗАМЕНА ОПРОСУ. Там, где промах недопустим (статус урока у ученика и
  * учителя), рядом стоит сторожевой опрос — он остаётся как был.
+ *
+ * ═══ 11.09.2026 — ПЕРЕПОДЪЁМ БОЛЬШЕ НЕ ЗАЦИКЛИВАЕТСЯ ════════════════════
+ *
+ * БЫЛО. После первого возврата во вкладку или сети канал снимался и
+ * открывался заново раз в секунду, без конца. removeChannel синхронно зовёт
+ * CLOSED у снимаемого канала, а обработчик не отличал снятый канал от
+ * текущего и заказывал новый подъём; нарастающей паузы не было вовсе.
+ * Симуляция на установленной realtime-js: 120 входов в канал за 120 с,
+ * до ученика доходило от 7 из 38 до 45 из 51 события слайда.
+ *
+ * СТАЛО. Текущий канал отвязывается до снятия, статусы уже снятого канала
+ * не слушаются. Та же симуляция: 1 вход, 38 событий из 38.
  */
 
 /** Пауза перед повторной попыткой, секунды по номеру попытки. */
@@ -79,9 +91,12 @@ export function useRealtimeChannel(
 
     function поднять() {
       if (снято) return;
-      if (channel) { db.removeChannel(channel); channel = null; }
+      // Сначала отвязать, потом снимать: removeChannel синхронно зовёт CLOSED
+      // у снимаемого канала, и тот не должен заказывать новый подъём.
+      if (channel) { const старый = channel; channel = null; db.removeChannel(старый); }
 
-      channel = db
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ch: any = db
         .channel(channelName as string)
         .on(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,14 +104,16 @@ export function useRealtimeChannel(
           { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (payload: any) => cbRef.current(payload as RealtimePayload),
-        )
-        .subscribe((status: string) => {
-          if (снято) return;
-          if (status === "SUBSCRIBED") { попытка = 0; return; }
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-            перезапустить();
-          }
-        });
+        );
+      channel = ch;
+      ch.subscribe((status: string) => {
+        // Статусы уже снятого канала к текущей подписке не относятся.
+        if (снято || ch !== channel) return;
+        if (status === "SUBSCRIBED") { попытка = 0; return; }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          перезапустить();
+        }
+      });
     }
 
     function перезапустить() {

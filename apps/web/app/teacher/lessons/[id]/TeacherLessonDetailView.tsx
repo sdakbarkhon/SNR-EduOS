@@ -1913,6 +1913,11 @@ export function TeacherLessonDetailView({
                     onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
                     isTeacher
                     stageId={stage.id}
+                    // 11.09.2026 — без статуса урока SlideViewer не пишет общий слайд
+                    // (запись требует "in_progress"), и ученики не следуют за учителем.
+                    // Сюда статус не передавали никогда; сломалось 07.08, когда запись
+                    // перестала обходиться без него (b9fb4a03).
+                    lessonStatus={status}
                     initialSlide={stage.current_slide_index ?? 0}
                     stageImageUrl={(stage as { image_url?: string | null }).image_url ?? null}
                   />
